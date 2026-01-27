@@ -154,10 +154,6 @@ pub trait Step<C: Cycle>: Sized + Send + Sync {
     /// The witness data needed to construct a proof for this step.
     type Witness<'source>: Send;
 
-    /// Auxiliary information produced during circuit synthesis. This may be
-    /// necessary to construct the [`Header::Data`] for the resulting proof.
-    type Aux<'source>: Send;
-
     /// The "left" header expected during this step.
     type Left: Header<C::CircuitField>;
 
@@ -167,7 +163,15 @@ pub trait Step<C: Cycle>: Sized + Send + Sync {
     /// The header produced during this step.
     type Output: Header<C::CircuitField>;
 
+    /// Auxiliary information produced during circuit synthesis. This may be
+    /// necessary to construct the [`Header::Data`] for the resulting proof,
+    /// or to pipeline witness data to future steps.
+    type Aux<'source>: Send;
+
     /// The main synthesis method that checks the validity of this merging step.
+    ///
+    /// Returns the encoded headers (left, right, output), the data to be
+    /// carried in the resulting PCD, and any auxiliary witness data.
     fn witness<'dr, 'source: 'dr, D: Driver<'dr, F = C::CircuitField>, const HEADER_SIZE: usize>(
         &self,
         dr: &mut D,
@@ -180,6 +184,7 @@ pub trait Step<C: Cycle>: Sized + Send + Sync {
             Encoded<'dr, D, Self::Right, HEADER_SIZE>,
             Encoded<'dr, D, Self::Output, HEADER_SIZE>,
         ),
+        DriverValue<D, <Self::Output as Header<C::CircuitField>>::Data<'source>>,
         DriverValue<D, Self::Aux<'source>>,
     )>
     where

@@ -199,7 +199,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
         rng: &mut RNG,
         step: S,
         witness: S::Witness<'source>,
-    ) -> Result<(Proof<C, R>, S::Aux<'source>)> {
+    ) -> Result<(Pcd<'source, C, R, S::Output>, S::Aux<'source>)> {
         self.fuse(rng, step, witness, self.trivial_pcd(), self.trivial_pcd())
     }
 
@@ -213,12 +213,15 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
     /// note that this may return the same proof on subsequent calls, and
     /// is not random.
     fn seeded_trivial_pcd<'source, RNG: CryptoRng>(&self, rng: &mut RNG) -> Pcd<'source, C, R, ()> {
-        let proof = self.seeded_trivial.get_or_init(|| {
-            self.seed(rng, step::internal::trivial::Trivial::new(), ())
-                .expect("seeded trivial seed should not fail")
-                .0
-        });
-        proof.clone().carry(())
+        self.seeded_trivial
+            .get_or_init(|| {
+                self.seed(rng, step::internal::trivial::Trivial::new(), ())
+                    .expect("seeded trivial seed should not fail")
+                    .0
+                    .proof
+            })
+            .clone()
+            .carry(())
     }
 
     /// Rerandomize proof-carrying data.
@@ -238,14 +241,16 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
         // Seed a trivial proof for rerandomization.
         // TODO: this is a temporary hack that allows the base case logic to be simple
         let seeded_trivial = self.seeded_trivial_pcd(rng);
-        let rerandomized_proof = self.fuse(
+
+        // The Rerandomize step's witness() method returns the left input's data,
+        // preserving it through rerandomization while producing a fresh proof.
+        self.fuse(
             rng,
             step::internal::rerandomize::Rerandomize::new(),
             (),
             pcd,
             seeded_trivial,
-        )?;
-
-        Ok(rerandomized_proof.0.carry(data))
+        )
+        .map(|(pcd, ())| pcd.proof.carry(data))
     }
 }

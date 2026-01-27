@@ -51,7 +51,7 @@ pub struct Hash2<'params, C: Cycle> {
 impl<C: Cycle> Step<C> for Hash2<'_, C> {
     const INDEX: Index = Index::new(1);
     type Witness<'source> = ();
-    type Aux<'source> = C::CircuitField;
+    type Aux<'source> = ();
     type Left = LeafNode;
     type Right = LeafNode;
     type Output = InternalNode;
@@ -68,6 +68,7 @@ impl<C: Cycle> Step<C> for Hash2<'_, C> {
             Encoded<'dr, D, Self::Right, HEADER_SIZE>,
             Encoded<'dr, D, Self::Output, HEADER_SIZE>,
         ),
+        DriverValue<D, <Self::Output as Header<C::CircuitField>>::Data<'source>>,
         DriverValue<D, Self::Aux<'source>>,
     )>
     where
@@ -80,10 +81,10 @@ impl<C: Cycle> Step<C> for Hash2<'_, C> {
         sponge.absorb(dr, left.as_gadget())?;
         sponge.absorb(dr, right.as_gadget())?;
         let output = sponge.squeeze(dr)?;
-        let output_value = output.value().map(|v| *v);
+        let output_data = output.value().map(|v| *v);
         let output = Encoded::from_gadget(output);
 
-        Ok(((left, right, output), output_value))
+        Ok(((left, right, output), output_data, D::just(|| ())))
     }
 }
 
@@ -94,7 +95,7 @@ pub struct WitnessLeaf<'params, C: Cycle> {
 impl<C: Cycle> Step<C> for WitnessLeaf<'_, C> {
     const INDEX: Index = Index::new(0);
     type Witness<'source> = C::CircuitField;
-    type Aux<'source> = C::CircuitField;
+    type Aux<'source> = ();
     type Left = ();
     type Right = ();
     type Output = LeafNode;
@@ -111,6 +112,7 @@ impl<C: Cycle> Step<C> for WitnessLeaf<'_, C> {
             Encoded<'dr, D, Self::Right, HEADER_SIZE>,
             Encoded<'dr, D, Self::Output, HEADER_SIZE>,
         ),
+        DriverValue<D, <Self::Output as Header<C::CircuitField>>::Data<'source>>,
         DriverValue<D, Self::Aux<'source>>,
     )>
     where
@@ -120,7 +122,7 @@ impl<C: Cycle> Step<C> for WitnessLeaf<'_, C> {
         let mut sponge = Sponge::new(dr, self.poseidon_params);
         sponge.absorb(dr, &leaf)?;
         let leaf = sponge.squeeze(dr)?;
-        let leaf_value = leaf.value().map(|v| *v);
+        let leaf_data = leaf.value().map(|v| *v);
         let leaf_encoded = Encoded::from_gadget(leaf);
 
         Ok((
@@ -129,7 +131,8 @@ impl<C: Cycle> Step<C> for WitnessLeaf<'_, C> {
                 Encoded::from_gadget(()),
                 leaf_encoded,
             ),
-            leaf_value,
+            leaf_data,
+            D::just(|| ()),
         ))
     }
 }

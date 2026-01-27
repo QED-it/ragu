@@ -76,13 +76,14 @@ impl<C: ragu_arithmetic::Cycle> Step<C> for Step0 {
             Encoded<'dr, D, Self::Right, HEADER_SIZE>,
             Encoded<'dr, D, Self::Output, HEADER_SIZE>,
         ),
+        DriverValue<D, <Self::Output as Header<C::CircuitField>>::Data<'source>>,
         DriverValue<D, Self::Aux<'source>>,
     )> {
         let left = Encoded::new(dr, left)?;
         let right = Encoded::new(dr, right)?;
         let output = Encoded::from_gadget(());
 
-        Ok(((left, right, output), D::just(|| ())))
+        Ok(((left, right, output), D::just(|| ()), D::just(|| ())))
     }
 }
 
@@ -107,13 +108,14 @@ impl<C: ragu_arithmetic::Cycle> Step<C> for Step1 {
             Encoded<'dr, D, Self::Right, HEADER_SIZE>,
             Encoded<'dr, D, Self::Output, HEADER_SIZE>,
         ),
+        DriverValue<D, <Self::Output as Header<C::CircuitField>>::Data<'source>>,
         DriverValue<D, Self::Aux<'source>>,
     )> {
         let left = Encoded::new(dr, left)?;
         let right = Encoded::new(dr, right)?;
         let output = Encoded::from_gadget(());
 
-        Ok(((left, right, output), D::just(|| ())))
+        Ok(((left, right, output), D::just(|| ()), D::just(|| ())))
     }
 }
 
@@ -138,13 +140,14 @@ impl<C: ragu_arithmetic::Cycle> Step<C> for Step1Dup {
             Encoded<'dr, D, Self::Right, HEADER_SIZE>,
             Encoded<'dr, D, Self::Output, HEADER_SIZE>,
         ),
+        DriverValue<D, <Self::Output as Header<C::CircuitField>>::Data<'source>>,
         DriverValue<D, Self::Aux<'source>>,
     )> {
         let left = Encoded::new(dr, left)?;
         let right = Encoded::new(dr, right)?;
         let output = Encoded::from_gadget(());
 
-        Ok(((left, right, output), D::just(|| ())))
+        Ok(((left, right, output), D::just(|| ()), D::just(|| ())))
     }
 }
 

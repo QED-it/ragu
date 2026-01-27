@@ -59,6 +59,7 @@ impl<C: Cycle, S: Step<C>, R: Rank, const HEADER_SIZE: usize> Circuit<C::Circuit
             FixedVec<C::CircuitField, ConstLen<HEADER_SIZE>>,
             FixedVec<C::CircuitField, ConstLen<HEADER_SIZE>>,
         ),
+        <S::Output as Header<C::CircuitField>>::Data<'source>,
         S::Aux<'source>,
     );
 
@@ -83,7 +84,7 @@ impl<C: Cycle, S: Step<C>, R: Rank, const HEADER_SIZE: usize> Circuit<C::Circuit
     {
         let (left, right, witness) = witness.cast();
 
-        let ((left, right, output), aux) = self
+        let ((left, right, output), output_data, step_aux) = self
             .step
             .witness::<_, HEADER_SIZE>(dr, witness, left, right)?;
 
@@ -103,10 +104,14 @@ impl<C: Cycle, S: Step<C>, R: Rank, const HEADER_SIZE: usize> Circuit<C::Circuit
                 .map(|e| *e.value().take())
                 .collect_fixed()?;
 
-            Ok(((left_header, right_header), aux.take()))
+            Ok((
+                (left_header, right_header),
+                output_data.take(),
+                step_aux.take(),
+            ))
         })?;
 
-        Ok((FixedVec::try_from(elements)?, aux))
+        Ok((FixedVec::try_from(elements)?, result))
     }
 }
 
@@ -146,7 +151,7 @@ mod tests {
     impl Step<Pasta> for TestStep {
         const INDEX: Index = Index::new(0);
         type Witness<'source> = ();
-        type Aux<'source> = Fp;
+        type Aux<'source> = ();
         type Left = TestHeader;
         type Right = TestHeader;
         type Output = TestHeader;
@@ -164,6 +169,7 @@ mod tests {
                 Encoded<'dr, D, Self::Output, HS>,
             ),
             DriverValue<D, Fp>,
+            DriverValue<D, ()>,
         )> {
             // Allocate elements for left and right
             let left_elem = Element::alloc(dr, left)?;
@@ -177,7 +183,11 @@ mod tests {
             let right_enc = Encoded::from_gadget(right_elem);
             let output_enc = Encoded::from_gadget(output_elem);
 
-            Ok(((left_enc, right_enc, output_enc), output_val))
+            Ok((
+                (left_enc, right_enc, output_enc),
+                output_val,
+                D::just(|| ()),
+            ))
         }
     }
 
@@ -216,13 +226,13 @@ mod tests {
             .witness(dr, witness)
             .expect("witness should succeed");
 
-        let ((left_header, right_header), step_aux) = aux.take();
+        let ((left_header, right_header), output_data, _step_aux) = aux.take();
 
         // Left header should start with 10
         assert_eq!(left_header[0], Fp::from(10u64));
         // Right header should start with 20
         assert_eq!(right_header[0], Fp::from(20u64));
         // Step aux should be 10 + 20 = 30
-        assert_eq!(step_aux, Fp::from(30u64));
+        assert_eq!(output_data, Fp::from(30u64));
     }
 }

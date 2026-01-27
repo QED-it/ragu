@@ -52,7 +52,7 @@ struct StepWithData;
 impl Step<Pasta> for StepWithData {
     const INDEX: Index = Index::new(0);
     type Witness<'source> = Fp;
-    type Aux<'source> = Fp;
+    type Aux<'source> = ();
     type Left = ();
     type Right = ();
     type Output = HeaderWithData;
@@ -68,12 +68,13 @@ impl Step<Pasta> for StepWithData {
             Encoded<'dr, D, Self::Right, HEADER_SIZE>,
             Encoded<'dr, D, Self::Output, HEADER_SIZE>,
         ),
+        DriverValue<D, <Self::Output as Header<Fp>>::Data<'source>>,
         DriverValue<D, Self::Aux<'source>>,
     )> {
         let left = Encoded::new(dr, left)?;
         let right = Encoded::new(dr, right)?;
         let output = Encoded::new(dr, witness.clone())?;
-        Ok(((left, right, output), witness))
+        Ok(((left, right, output), witness, D::just(|| ())))
     }
 }
 
@@ -98,12 +99,13 @@ impl<C: Cycle> Step<C> for Step0 {
             Encoded<'dr, D, Self::Right, HEADER_SIZE>,
             Encoded<'dr, D, Self::Output, HEADER_SIZE>,
         ),
+        DriverValue<D, <Self::Output as Header<C::CircuitField>>::Data<'source>>,
         DriverValue<D, Self::Aux<'source>>,
     )> {
         let left = Encoded::new(dr, left)?;
         let right = Encoded::new(dr, right)?;
         let output = Encoded::from_gadget(());
-        Ok(((left, right, output), D::just(|| ())))
+        Ok(((left, right, output), D::just(|| ()), D::just(|| ())))
     }
 }
 
@@ -127,12 +129,13 @@ impl<C: Cycle> Step<C> for Step1 {
             Encoded<'dr, D, Self::Right, HEADER_SIZE>,
             Encoded<'dr, D, Self::Output, HEADER_SIZE>,
         ),
+        DriverValue<D, <Self::Output as Header<C::CircuitField>>::Data<'source>>,
         DriverValue<D, Self::Aux<'source>>,
     )> {
         let left = Encoded::new(dr, left)?;
         let right = Encoded::new(dr, right)?;
         let output = Encoded::from_gadget(());
-        Ok(((left, right, output), D::just(|| ())))
+        Ok(((left, right, output), D::just(|| ()), D::just(|| ())))
     }
 }
 
@@ -149,19 +152,16 @@ fn rerandomization_flow() {
 
     let mut rng = StdRng::seed_from_u64(1234);
 
-    let seeded = app.seed(&mut rng, Step0, ()).unwrap().0;
-    let seeded = seeded.carry::<HeaderA>(());
+    let (seeded, _) = app.seed(&mut rng, Step0, ()).unwrap();
     assert!(app.verify(&seeded, &mut rng).unwrap());
 
     // Rerandomize
     let seeded = app.rerandomize(seeded, &mut rng).unwrap();
     assert!(app.verify(&seeded, &mut rng).unwrap());
 
-    let fused = app
+    let (fused, _) = app
         .fuse(&mut rng, Step1, (), seeded.clone(), seeded)
-        .unwrap()
-        .0;
-    let fused = fused.carry::<HeaderA>(());
+        .unwrap();
     assert!(app.verify(&fused, &mut rng).unwrap());
 
     let fused = app.rerandomize(fused, &mut rng).unwrap();
@@ -179,8 +179,7 @@ fn multiple_rerandomizations_all_verify() {
 
     let mut rng = StdRng::seed_from_u64(9999);
 
-    let original = app.seed(&mut rng, Step0, ()).unwrap().0;
-    let original = original.carry::<HeaderA>(());
+    let (original, _) = app.seed(&mut rng, Step0, ()).unwrap();
     assert!(app.verify(&original, &mut rng).unwrap());
 
     // Rerandomize multiple times - each should verify
@@ -209,8 +208,7 @@ fn rerandomization_preserves_header_data() {
     // Use a non-trivial data value
     let test_data = Fp::from(123456789u64);
 
-    let original = app.seed(&mut rng, StepWithData, test_data).unwrap().0;
-    let original = original.carry::<HeaderWithData>(test_data);
+    let (original, _) = app.seed(&mut rng, StepWithData, test_data).unwrap();
     assert!(app.verify(&original, &mut rng).unwrap());
 
     let rerandomized = app.rerandomize(original.clone(), &mut rng).unwrap();
@@ -242,20 +240,11 @@ fn rerandomized_fused_proof_verifies() {
     let mut rng = StdRng::seed_from_u64(7777);
 
     // Create two seeded proofs
-    let left = app
-        .seed(&mut rng, Step0, ())
-        .unwrap()
-        .0
-        .carry::<HeaderA>(());
-    let right = app
-        .seed(&mut rng, Step0, ())
-        .unwrap()
-        .0
-        .carry::<HeaderA>(());
+    let (left, _) = app.seed(&mut rng, Step0, ()).unwrap();
+    let (right, _) = app.seed(&mut rng, Step0, ()).unwrap();
 
     // Fuse them
-    let fused = app.fuse(&mut rng, Step1, (), left, right).unwrap().0;
-    let fused = fused.carry::<HeaderA>(());
+    let (fused, _) = app.fuse(&mut rng, Step1, (), left, right).unwrap();
     assert!(app.verify(&fused, &mut rng).unwrap());
 
     // Rerandomize the fused proof

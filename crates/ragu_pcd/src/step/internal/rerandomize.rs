@@ -9,6 +9,7 @@ use ragu_arithmetic::Cycle;
 use ragu_core::{
     Result,
     drivers::{Driver, DriverValue},
+    maybe::Maybe,
 };
 
 use core::marker::PhantomData;
@@ -52,10 +53,11 @@ impl<C: Cycle, H: Header<C::CircuitField>> Step<C> for Rerandomize<H> {
             Encoded<'dr, D, Self::Right, HEADER_SIZE>,
             Encoded<'dr, D, Self::Output, HEADER_SIZE>,
         ),
+        DriverValue<D, <Self::Output as Header<C::CircuitField>>::Data<'source>>,
         DriverValue<D, Self::Aux<'source>>,
     )> {
         // Use uniform encoding for left to ensure circuit uniformity across header types
-        let left = Encoded::new_uniform(dr, left)?;
+        let left_encoded = Encoded::new_uniform(dr, left.clone())?;
         // Use standard encoding for right (trivial header)
         let right = Encoded::new(dr, right)?;
 
@@ -68,7 +70,12 @@ impl<C: Cycle, H: Header<C::CircuitField>> Step<C> for Rerandomize<H> {
         // here if the amount of wires needed depended on HEADER_SIZE and R:
         // Rank, both of which are not in scope here.
 
-        Ok(((left.clone(), right, left), D::just(|| ())))
+        // Return left's data as the output data - this preserves it!
+        Ok((
+            (left_encoded.clone(), right, left_encoded),
+            left,
+            D::just(|| ()),
+        ))
     }
 }
 

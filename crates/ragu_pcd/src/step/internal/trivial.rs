@@ -10,6 +10,7 @@ use ragu_core::{
 };
 
 use super::super::{Encoded, Index, Step};
+use crate::Header;
 
 pub(crate) use crate::step::InternalStepIndex::Trivial as INTERNAL_ID;
 
@@ -43,12 +44,13 @@ impl<C: Cycle> Step<C> for Trivial {
             Encoded<'dr, D, Self::Right, HEADER_SIZE>,
             Encoded<'dr, D, Self::Output, HEADER_SIZE>,
         ),
+        DriverValue<D, <Self::Output as Header<C::CircuitField>>::Data<'source>>,
         DriverValue<D, Self::Aux<'source>>,
     )> {
         let left = Encoded::new(dr, left)?;
         let right = Encoded::new(dr, right)?;
         let output = Encoded::from_gadget(());
 
-        Ok(((left, right, output), D::just(|| ())))
+        Ok(((left, right, output), D::just(|| ()), D::just(|| ())))
     }
 }

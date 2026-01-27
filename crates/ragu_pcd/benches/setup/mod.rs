@@ -58,23 +58,21 @@ pub fn setup_fuse() -> (
 ) {
     let (app, poseidon_params, mut rng) = setup_seed();
 
-    let (proof1, aux1) = app
+    let (leaf1, _) = app
         .seed(
             &mut rng,
             nontrivial::WitnessLeaf { poseidon_params },
             Fp::from(1u64),
         )
         .unwrap();
-    let leaf1 = proof1.carry::<nontrivial::LeafNode>(aux1);
 
-    let (proof2, aux2) = app
+    let (leaf2, _) = app
         .seed(
             &mut rng,
             nontrivial::WitnessLeaf { poseidon_params },
             Fp::from(2u64),
         )
         .unwrap();
-    let leaf2 = proof2.carry::<nontrivial::LeafNode>(aux2);
 
     (app, leaf1, leaf2, poseidon_params, rng)
 }
@@ -86,14 +84,13 @@ pub fn setup_verify_leaf() -> (
 ) {
     let (app, poseidon_params, mut rng) = setup_seed();
 
-    let (proof, aux) = app
+    let (leaf, _) = app
         .seed(
             &mut rng,
             nontrivial::WitnessLeaf { poseidon_params },
             Fp::from(1u64),
         )
         .unwrap();
-    let leaf = proof.carry::<nontrivial::LeafNode>(aux);
 
     (app, leaf, rng)
 }
@@ -105,25 +102,23 @@ pub fn setup_verify_node() -> (
 ) {
     let (app, poseidon_params, mut rng) = setup_seed();
 
-    let (proof1, aux1) = app
+    let (leaf1, _) = app
         .seed(
             &mut rng,
             nontrivial::WitnessLeaf { poseidon_params },
             Fp::from(1u64),
         )
         .unwrap();
-    let leaf1 = proof1.carry::<nontrivial::LeafNode>(aux1);
 
-    let (proof2, aux2) = app
+    let (leaf2, _) = app
         .seed(
             &mut rng,
             nontrivial::WitnessLeaf { poseidon_params },
             Fp::from(2u64),
         )
         .unwrap();
-    let leaf2 = proof2.carry::<nontrivial::LeafNode>(aux2);
 
-    let (proof, aux) = app
+    let (node, _) = app
         .fuse(
             &mut rng,
             nontrivial::Hash2 { poseidon_params },
@@ -132,7 +127,6 @@ pub fn setup_verify_node() -> (
             leaf2,
         )
         .unwrap();
-    let node = proof.carry::<nontrivial::InternalNode>(aux);
 
     (app, node, rng)
 }

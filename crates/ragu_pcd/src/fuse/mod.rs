@@ -56,8 +56,8 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
         witness: S::Witness<'source>,
         left: Pcd<'source, C, R, S::Left>,
         right: Pcd<'source, C, R, S::Right>,
-    ) -> Result<(Proof<C, R>, S::Aux<'source>)> {
-        let (left, right, application, application_aux) =
+    ) -> Result<(Pcd<'source, C, R, S::Output>, S::Aux<'source>)> {
+        let (left, right, application, application_data, application_aux) =
             self.compute_application_proof(rng, step, witness, left, right)?;
 
         let mut dr = Emulator::execute();
@@ -161,23 +161,22 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
             &challenges,
         )?;
 
-        Ok((
-            Proof {
-                application,
-                preamble,
-                s_prime,
-                error_n,
-                error_m,
-                ab,
-                query,
-                f,
-                eval,
-                p,
-                challenges,
-                circuits,
-            },
-            application_aux,
-        ))
+        let proof = Proof {
+            application,
+            preamble,
+            s_prime,
+            error_n,
+            error_m,
+            ab,
+            query,
+            f,
+            eval,
+            p,
+            challenges,
+            circuits,
+        };
+
+        Ok((proof.carry(application_data), application_aux))
     }
 }
 
