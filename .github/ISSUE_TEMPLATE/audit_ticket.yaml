@@ -1,0 +1,43 @@
+name: Ragu Audit Ticket
+description: Flag issues with Ragu as part of the QEDIT audit
+body:
+  - type: dropdown
+    id: crate
+    attributes:
+      label: Crate
+      description: What ragu crate is this related to?
+      options:
+        - ragu_arithmetic
+        - ragu_circuits
+        - ragu_core
+        - ragu_gadgets
+        - ragu_macros
+        - ragu_pasta
+        - ragu_pcd
+        - ragu_primitives
+      default: 0
+    validations:
+      required: true
+  - type: textarea
+    id: current-behavior
+    attributes:
+      label: What is the current behavior and what is the issue with it?
+      description: A concise description of the issue with the Ragu code (if you describe a bug, include env details and steps to reproduce)
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: What is the expected behavior? How to fix the code?
+      description: A concise description of the fix
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
+      render: shell
+    validations:
+      required: false
+
