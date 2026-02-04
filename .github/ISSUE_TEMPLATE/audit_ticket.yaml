@@ -41,21 +41,21 @@ body:
     validations:
       required: true
 
-  - type: markdown
+  - type: textarea
     id: code
     attributes:
+      label: Code
+      description: Relevant code and any new tests that reproduce the issue.
+      render: shell
       value: |
-        **Code**
-
-        Provide the relevant existing code and newly created tests to demonstrate the issue.
-
-        File name: `crates/ragu_circuits/src/mesh.rs`
+        File name: `crates/.../src/...`
 
         ```rust
-        pub fn omega_j<F: PrimeField>(self) -> F {
-            let bit_reversal_id = bitreverse(self.0, F::S);
-            F::ROOT_OF_UNITY.pow([bit_reversal_id.into()])
-        }
+        // existing code
+        ```
+
+        ```rust
+        // new test(s) demonstrating the issue
         ```
     validations:
       required: false
