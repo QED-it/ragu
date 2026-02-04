@@ -19,16 +19,16 @@ body:
     validations:
       required: true
 
-   - type: dropdown
+  - type: dropdown
     id: severity
     attributes:
       label: Severity
       description: Select the issue severity.
       options:
-        - "low"
-        - "medium"
-        - "high"
-        - "critical"
+        - low
+        - medium
+        - high
+        - critical
       default: 0
     validations:
       required: true
