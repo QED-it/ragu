@@ -46,16 +46,16 @@ body:
     attributes:
       label: Code
       description: Relevant code and any new tests that reproduce the issue.
-      render: shell
       value: |
-        File name: `crates/.../src/...`
+        File name: `...crates/ragu_circuits/src/mesh.rs...`
 
         ```rust
         // existing code
+          pub fn omega_j<F: PrimeField>(self) -> F {}
         ```
 
         ```rust
-        // new test(s) demonstrating the issue
+        // a new test to demonstrate the issue, if needed.
         ```
     validations:
       required: false
