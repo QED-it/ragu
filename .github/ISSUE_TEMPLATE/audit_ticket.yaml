@@ -5,7 +5,7 @@ body:
     id: crate
     attributes:
       label: Crate
-      description: What ragu crate is this related to?
+      description: Which Ragu crate is this related to?
       options:
         - ragu_arithmetic
         - ragu_circuits
@@ -18,26 +18,52 @@ body:
       default: 0
     validations:
       required: true
-  - type: textarea
-    id: current-behavior
+
+   - type: dropdown
+    id: severity
     attributes:
-      label: What is the current behavior and what is the issue with it?
-      description: A concise description of the issue with the Ragu code (if you describe a bug, include env details and steps to reproduce)
+      label: Severity
+      description: Select the issue severity.
+      options:
+        - "low"
+        - "medium"
+        - "high"
+        - "critical"
+      default: 0
     validations:
       required: true
+
   - type: textarea
-    id: expected-behavior
+    id: description
     attributes:
-      label: What is the expected behavior? How to fix the code?
-      description: A concise description of the fix
+      label: Description
+      description: A concise description of the issue in the Ragu code. If you describe a bug, include environment details and steps to reproduce.
     validations:
       required: true
-  - type: textarea
-    id: logs
+
+  - type: markdown
+    id: code
     attributes:
-      label: Relevant log output
-      description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
-      render: shell
+      value: |
+        **Code**
+
+        Provide the relevant existing code and newly created tests to demonstrate the issue.
+
+        File name: `crates/ragu_circuits/src/mesh.rs`
+
+        ```rust
+        pub fn omega_j<F: PrimeField>(self) -> F {
+            let bit_reversal_id = bitreverse(self.0, F::S);
+            F::ROOT_OF_UNITY.pow([bit_reversal_id.into()])
+        }
+        ```
     validations:
       required: false
 
+  - type: textarea
+    id: recommendations
+    attributes:
+      label: Recommendations
+      description: Provide recommendations for resolution / remediation.
+    validations:
+      required: false
