@@ -144,7 +144,7 @@ impl<'dr, D: Driver<'dr>, P: ragu_arithmetic::PoseidonPermutation<D::F>> Sponge<
                     self.permute(dr)?;
                 } else {
                     // Squeeze a value and return it
-                    return Ok(values.pop().unwrap());
+                    return Ok(values.pop().expect("values is not empty, so pop succeeds"));
                 }
             }
             Mode::Absorb { values, state } => {
@@ -198,7 +198,7 @@ impl<'dr, D: Driver<'dr>, P: ragu_arithmetic::PoseidonPermutation<D::F>> Sponge<
     /// permutation, consume the sponge, and return the raw [`SpongeState`].
     ///
     /// Later, the [`SpongeState`] can be passed to
-    /// [`Transcript::resume_from`](crate::transcript::TranscriptExt::resume_from)
+    /// [`Transcript::resume_from_state`](crate::transcript::TranscriptExt::resume_from_state)
     /// to continue the protocol.
     ///
     /// # Errors
@@ -247,7 +247,7 @@ impl<'dr, D: Driver<'dr>, P: ragu_arithmetic::PoseidonPermutation<D::F>> Sponge<
 /// This type holds `P::T` field elements representing the internal state
 /// of the sponge. It can be used to save and resume sponge progress via
 /// [`Sponge::save_state`] and [`Sponge::resume`], or passed to
-/// [`Transcript::resume_from`](crate::transcript::TranscriptExt::resume_from).
+/// [`Transcript::resume_from_state`](crate::transcript::TranscriptExt::resume_from_state).
 #[derive(Gadget, Write, Consistent)]
 pub struct SpongeState<'dr, D: Driver<'dr>, P: ragu_arithmetic::PoseidonPermutation<D::F>> {
     #[ragu(gadget)]
@@ -357,7 +357,11 @@ impl<F: Field, P: ragu_arithmetic::PoseidonPermutation<F>> Routine<F> for Permut
         let mut mds_scratch = Vec::with_capacity(P::T);
 
         let mut round = |dr: &mut D, elems| {
-            add_round_constants(dr, &mut state.values[..], rcs.next().unwrap());
+            add_round_constants(
+                dr,
+                &mut state.values[..],
+                rcs.next().expect("round constants match total round count"),
+            );
             sbox::<_, P>(dr, &mut state.values[0..elems])?;
             mds(
                 dr,
