@@ -1,8 +1,3 @@
-//! Security audit verification tests for ragu_arithmetic.
-//!
-//! Each test targets one specific finding from the audit, demonstrating
-//! the issue exists at the current code level.
-
 use pasta_curves::{
     Fp as F,
     group::{Curve, prime::PrimeCurveAffine},
