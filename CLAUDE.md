@@ -145,6 +145,23 @@ mdbook 0.4.52, mdbook-katex (LaTeX math), mdbook-mermaid (diagrams), mdbook-admo
 - KaTeX math rendering in docs via `katex-header.html`
 - Workspace dependencies centralized in root `Cargo.toml`
 
+## Audit Documentation
+
+Background and mathematical foundations docs for each crate live in `audit_docs/`:
+
+| File | Crate | Covers |
+|------|-------|--------|
+| `audit_docs/ragu_arithmetic.md` | ragu_arithmetic | Finite fields, polynomials (eval/factor/dot/geosum), FFT/domains, barycentric interpolation (ell), bitreverse, MSM (Pippenger), Coeff tags, revdot product, endoscalars/uendo, Cycle/PoseidonPermutation/FixedGenerators traits |
+| `audit_docs/ragu_macros.md` | ragu_macros | Gadget derive (wire/value/gadget/phantom field handling), Write derive, Kind! macro, repr256!, MaybeCast tuple generation |
+| `audit_docs/ragu_core.md` | ragu_core | Driver trait (alloc/mul/add/enforce_zero), Maybe monad (Always/Empty), Gadget/GadgetKind traits, LinearExpression, Routine (predict/execute), Emulator driver, FromDriver |
+| `audit_docs/ragu_primitives.md` | ragu_primitives | Element/Boolean/Point/Endoscalar gadgets, Poseidon sponge, Simulator driver, FixedVec, IO/Write/Buffer, Promotion/Demoted |
+| `audit_docs/ragu_pasta.md` | ragu_pasta | Pasta curve cycle (Pallas/Vesta), fixed generators (8192 points), baked() feature, Poseidon parameters (Fp/Fq, T=5, alpha=5) |
+| `audit_docs/ragu_gadgets.md` | ragu_gadgets | Empty stub — nothing to review |
+| `audit_docs/ragu_circuits.md` | ragu_circuits | Circuit trait, SXY/RX/SY drivers, structured/unstructured polynomials, Rank system, Mesh/registry, staging (Stage/StageBuilder/StageObject), metrics |
+| `audit_docs/ragu_pcd.md` | ragu_pcd | Step/Header traits, ApplicationBuilder, 11-stage fuse pipeline (_01 application through _11 circuits), Proof structure, two-field recursion, revdot claims/folding, verification, internal steps (trivial/rerandomize) |
+
+Each doc includes: numbered concept sections, book links (https://tachyon.z.cash/ragu/...), protocol mapping table, and source file reading order. Consult these docs when reviewing or auditing individual crates.
+
 ## MSRV Update Checklist
 
 When bumping minimum supported Rust version, update all of:
