@@ -33,7 +33,7 @@ body:
     validations:
       required: true
 
- - type: dropdown
+  - type: dropdown
     id: repo_commit
     attributes:
       label: Repo commit
@@ -78,4 +78,3 @@ body:
       description: Provide recommendations for resolution / remediation.
     validations:
       required: false
-      
