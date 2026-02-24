@@ -33,6 +33,17 @@ body:
     validations:
       required: true
 
+ - type: dropdown
+    id: repo_commit
+    attributes:
+      label: Repo commit
+      description: Select the relevant Ragu commit.
+      options:
+        - "c9649de"
+      default: 0
+    validations:
+      required: false
+
   - type: textarea
     id: description
     attributes:
@@ -67,3 +78,4 @@ body:
       description: Provide recommendations for resolution / remediation.
     validations:
       required: false
+      
