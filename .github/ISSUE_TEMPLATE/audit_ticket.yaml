@@ -39,7 +39,7 @@ body:
       label: Repo commit
       description: Select the relevant Ragu commit.
       options:
-        - "c9649de"
+        - c9649de
       default: 0
     validations:
       required: false
