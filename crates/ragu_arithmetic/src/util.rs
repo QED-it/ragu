@@ -1,4 +1,7 @@
 use ff::{Field, PrimeField};
+use maybe_rayon::iter::IntoParallelIterator as _;
+#[allow(unused_imports)]
+use maybe_rayon::iter::ParallelIterator as _;
 use pasta_curves::{arithmetic::CurveAffine, group::Group};
 
 use alloc::{boxed::Box, vec, vec::Vec};
@@ -156,7 +159,7 @@ pub fn mul<
     'a,
     C: CurveAffine,
     A: IntoIterator<Item = &'a C::Scalar>,
-    B: IntoIterator<Item = &'a C> + Clone + Sync,
+    B: IntoIterator<Item = &'a C>,
 >(
     coeffs: A,
     bases: B,
@@ -220,15 +223,15 @@ pub fn mul<
     }
 
     /// Compute the bucket sum for a single window segment.
-    fn window_sum<'b, C: CurveAffine, I: Iterator<Item = &'b C>>(
+    fn window_sum<C: CurveAffine>(
         current_segment: usize,
         c: usize,
         coeffs: &[<C::Scalar as PrimeField>::Repr],
-        bases: I,
+        bases: &[C],
     ) -> C::Curve {
         let mut buckets: Vec<Bucket<C>> = vec![Bucket::None; (1 << c) - 1];
 
-        for (coeff, base) in coeffs.iter().zip(bases) {
+        for (coeff, base) in coeffs.iter().zip(bases.iter()) {
             let coeff = get_at::<C::Scalar>(current_segment, c, coeff);
             if coeff != 0 {
                 buckets[coeff - 1].add_assign(base);
@@ -248,29 +251,23 @@ pub fn mul<
         sum
     }
 
-    #[cfg(feature = "multicore")]
-    let window_sums = {
-        use rayon::iter::{IntoParallelIterator, ParallelIterator};
-        (0..segments)
-            .into_par_iter()
-            .map(|seg| window_sum(seg, c, &coeffs, bases.clone().into_iter()))
-            .collect::<Vec<_>>()
-            .into_iter()
-            .rev()
-    };
+    let bases_vec: Vec<C> = bases.into_iter().copied().collect();
 
-    #[cfg(not(feature = "multicore"))]
-    let window_sums = (0..segments)
-        .map(|seg| window_sum(seg, c, &coeffs, bases.clone().into_iter()))
-        .rev();
+    // Compute each window's bucket sum in parallel (or sequentially via maybe-rayon facade).
+    let window_sums: Vec<C::Curve> = (0..segments)
+        .into_par_iter()
+        .map(|seg| window_sum(seg, c, &coeffs, &bases_vec))
+        .collect();
 
+    // Combine window sums sequentially, from most significant to least.
     let mut acc = C::Curve::identity();
-    for sum in window_sums {
+    for sum in window_sums.into_iter().rev() {
         for _ in 0..c {
             acc = acc.double();
         }
         acc += &sum;
     }
+
     acc
 }
 

@@ -21,7 +21,7 @@ all-features = true
 
 [features]
 default = []
-multicore = ["dep:rayon", "std"]
+multicore = ["maybe-rayon/threads", "std"]
 std = []
 
 [lib]
@@ -32,7 +32,7 @@ ff = { workspace = true }
 pasta_curves = { workspace = true }
 ragu_macros = { path = "../ragu_macros", version = "0.0.0" }
 rand = { workspace = true }
-rayon = { workspace = true, optional = true }
+maybe-rayon = { workspace = true }
 
 [dev-dependencies]
 proptest = { workspace = true }
