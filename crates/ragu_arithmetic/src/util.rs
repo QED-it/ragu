@@ -1,12 +1,9 @@
+use alloc::{boxed::Box, vec, vec::Vec};
 use ff::{Field, PrimeField};
-use maybe_rayon::iter::IntoParallelIterator as _;
-#[allow(unused_imports)]
-use maybe_rayon::iter::ParallelIterator as _;
 use pasta_curves::{arithmetic::CurveAffine, group::Group};
 
-use alloc::{boxed::Box, vec, vec::Vec};
-
 use crate::domain::Domain;
+use crate::multicore::*;
 
 /// Evaluates a polynomial $p \in \mathbb{F}\[X]$ at a point $x \in \mathbb{F}$,
 /// where $p$ is defined by `coeffs` in ascending order of degree.

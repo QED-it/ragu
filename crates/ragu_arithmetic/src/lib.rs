@@ -73,6 +73,7 @@ extern crate alloc;
 mod coeff;
 mod domain;
 mod fft;
+mod multicore;
 mod uendo;
 mod util;
 
