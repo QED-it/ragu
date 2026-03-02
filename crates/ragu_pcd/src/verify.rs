@@ -149,23 +149,7 @@ mod native {
         type AppCircuitId = CircuitIndex;
 
         fn rx(&self, component: RxComponent) -> impl Iterator<Item = Self::Rx> {
-            use RxComponent::*;
-            let poly = match component {
-                AbA => &self.proof.ab.a_poly,
-                AbB => &self.proof.ab.b_poly,
-                Application => &self.proof.application.rx,
-                Hashes1 => &self.proof.circuits.hashes_1_rx,
-                Hashes2 => &self.proof.circuits.hashes_2_rx,
-                PartialCollapse => &self.proof.circuits.partial_collapse_rx,
-                FullCollapse => &self.proof.circuits.full_collapse_rx,
-                ComputeV => &self.proof.circuits.compute_v_rx,
-                Preamble => &self.proof.preamble.native_rx,
-                ErrorM => &self.proof.error_m.native_rx,
-                ErrorN => &self.proof.error_n.native_rx,
-                Query => &self.proof.query.native_rx,
-                Eval => &self.proof.eval.native_rx,
-            };
-            core::iter::once(poly)
+            core::iter::once(self.proof.native_rx(component))
         }
 
         fn app_circuits(&self) -> impl Iterator<Item = Self::AppCircuitId> {

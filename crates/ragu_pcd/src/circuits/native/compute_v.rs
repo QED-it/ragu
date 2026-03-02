@@ -43,6 +43,7 @@
 //! [$\mu'$]: unified::Output::mu_prime
 //! [$\nu'$]: unified::Output::nu_prime
 
+use ff::Field;
 use ragu_arithmetic::Cycle;
 use ragu_circuits::{
     polynomials::{Rank, txz::Evaluate},
@@ -56,7 +57,7 @@ use ragu_core::{
 };
 use ragu_primitives::{Element, Endoscalar, GadgetExt};
 
-use alloc::vec::Vec;
+use alloc::{vec, vec::Vec};
 use core::marker::PhantomData;
 
 use crate::components::claims::{
@@ -777,7 +778,7 @@ impl<'dr, D: Driver<'dr, F: ff::PrimeField>> Inverter<'dr, D> {
                 .map(|diff| **diff.value().snag())
                 .collect::<Vec<_>>();
 
-            let mut scratch = differences.clone();
+            let mut scratch = vec![D::F::ZERO; differences.len()];
             ff::BatchInverter::invert_with_external_scratch(&mut differences, &mut scratch);
 
             differences.into_iter()

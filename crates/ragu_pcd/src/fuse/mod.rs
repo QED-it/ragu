@@ -182,41 +182,11 @@ impl<'rx, C: Cycle, R: Rank> Source for FuseProofSource<'rx, C, R> {
     type AppCircuitId = CircuitIndex;
 
     fn rx(&self, component: RxComponent) -> impl Iterator<Item = Self::Rx> {
-        use RxComponent::*;
-        let (left_poly, right_poly) = match component {
-            AbA => (&self.left.ab.a_poly, &self.right.ab.a_poly),
-            AbB => (&self.left.ab.b_poly, &self.right.ab.b_poly),
-            Application => (&self.left.application.rx, &self.right.application.rx),
-            Hashes1 => (
-                &self.left.circuits.hashes_1_rx,
-                &self.right.circuits.hashes_1_rx,
-            ),
-            Hashes2 => (
-                &self.left.circuits.hashes_2_rx,
-                &self.right.circuits.hashes_2_rx,
-            ),
-            PartialCollapse => (
-                &self.left.circuits.partial_collapse_rx,
-                &self.right.circuits.partial_collapse_rx,
-            ),
-            FullCollapse => (
-                &self.left.circuits.full_collapse_rx,
-                &self.right.circuits.full_collapse_rx,
-            ),
-            ComputeV => (
-                &self.left.circuits.compute_v_rx,
-                &self.right.circuits.compute_v_rx,
-            ),
-            Preamble => (
-                &self.left.preamble.native_rx,
-                &self.right.preamble.native_rx,
-            ),
-            ErrorM => (&self.left.error_m.native_rx, &self.right.error_m.native_rx),
-            ErrorN => (&self.left.error_n.native_rx, &self.right.error_n.native_rx),
-            Query => (&self.left.query.native_rx, &self.right.query.native_rx),
-            Eval => (&self.left.eval.native_rx, &self.right.eval.native_rx),
-        };
-        [left_poly, right_poly].into_iter()
+        [
+            self.left.native_rx(component),
+            self.right.native_rx(component),
+        ]
+        .into_iter()
     }
 
     fn app_circuits(&self) -> impl Iterator<Item = Self::AppCircuitId> {

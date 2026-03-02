@@ -292,14 +292,17 @@ fn mds<'i, 'dr, D: Driver<'dr>>(
     dr: &mut D,
     state: &mut [Element<'dr, D>],
     matrix: impl ExactSizeIterator<Item = &'i [D::F]>,
+    scratch: &mut Vec<Element<'dr, D>>,
 ) -> Result<()> {
     assert_eq!(state.len(), matrix.len());
-    let tmp: Vec<_> = state
-        .iter()
-        .zip(matrix)
-        .map(|(_, coeffs)| multiadd(dr, state, coeffs))
-        .collect();
-    state.clone_from_slice(&tmp[..]);
+    scratch.clear();
+    scratch.extend(
+        state
+            .iter()
+            .zip(matrix)
+            .map(|(_, coeffs)| multiadd(dr, state, coeffs)),
+    );
+    state.clone_from_slice(&scratch[..]);
 
     Ok(())
 }
@@ -352,11 +355,17 @@ impl<F: Field, P: ragu_arithmetic::PoseidonPermutation<F>> Routine<F> for Permut
         _: DriverValue<D, Self::Aux<'dr>>,
     ) -> Result<Bound<'dr, D, Self::Output>> {
         let mut rcs = self.params.round_constants();
+        let mut mds_scratch = Vec::with_capacity(P::T);
 
         let mut round = |dr: &mut D, elems| {
             add_round_constants(dr, &mut state.values[..], rcs.next().unwrap());
             sbox::<_, P>(dr, &mut state.values[0..elems])?;
-            mds(dr, &mut state.values[..], self.params.mds_matrix())?;
+            mds(
+                dr,
+                &mut state.values[..],
+                self.params.mds_matrix(),
+                &mut mds_scratch,
+            )?;
 
             Ok(())
         };
