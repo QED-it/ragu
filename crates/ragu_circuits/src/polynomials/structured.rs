@@ -121,6 +121,21 @@ impl<F: Field, R: Rank> Polynomial<F, R> {
     }
 
     /// Inner product of `self` with the reversed `other`.
+    ///
+    /// Given a structured polynomial
+    /// P(x) = \sum_{i=0}^{n-1} (w_i x^i + v_i x^{2n-1-i} + u_i x^{2n+i} + d_i x^{4n-1-i})
+    /// the coefficient vector is coeffs(P) = (w || rev(v) || u || rev(d)).
+    /// Similarly for Q, coeffs(Q) = (w' || rev(v') || u' || rev(d')).
+    ///
+    /// Reversing Q gives rev(coeffs(Q)) = (d' || rev(u') || v' || rev(w')), so
+    ///
+    /// revdot(P, Q) = <(w || rev(v) || u || rev(d)), (d' || rev(u') || v' || rev(w'))>
+    ///              = <w, d'> + <rev(v), rev(u')> + <u, v'> + <rev(d), rev(w')>
+    ///
+    /// Since <rev(a), rev(b)> = <a, b>
+    /// (see the [arithmetization chapter](https://tachyon.z.cash/ragu/protocol/core/arithmetization.html))
+    ///
+    /// revdot(P, Q) = <u, v'> + <v, u'> + <w, d'> + <d, w'>
     pub fn revdot(&self, other: &Self) -> F {
         self.u
             .iter()
