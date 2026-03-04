@@ -50,9 +50,7 @@ where
     b = -b;
     let mut a = a.into_iter().rev().peekable();
 
-    if a.peek().is_none() {
-        panic!("cannot factor a polynomial of degree 0");
-    }
+    assert!(a.peek().is_some(), "cannot factor a polynomial of degree 0");
 
     let mut tmp = F::ZERO;
 

@@ -37,13 +37,12 @@ impl<F: PrimeField> Domain<F> {
     /// Panics if attempting to create a domain larger than supported by the
     /// field.
     pub fn new(k: u32) -> Self {
-        if k > F::S {
-            panic!(
-                "tried to create a domain of size 2^{} in a field with 2-adicity {}",
-                k,
-                F::S
-            );
-        }
+        assert!(
+            k <= F::S,
+            "tried to create a domain of size 2^{} in a field with 2-adicity {}",
+            k,
+            F::S
+        );
 
         let mut tmp = Self::default();
         for _ in k..F::S {
@@ -59,9 +58,7 @@ impl<F: PrimeField> Domain<F> {
     ///
     /// Panics if attempting to halve a domain of size 1.
     fn halve(&self) -> Self {
-        if self.log2_n == 0 {
-            panic!("cannot halve a domain of size 1");
-        }
+        assert!(self.log2_n != 0, "cannot halve a domain of size 1");
 
         let log2_n = self.log2_n - 1;
         Domain {
