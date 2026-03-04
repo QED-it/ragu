@@ -23,7 +23,7 @@
 //! accidentally including it in equivalence maps.
 //!
 //! The scalar is the routine's $s(X,Y)$ contribution (see
-//! [`sxy::Evaluator`](super::s::sxy::Evaluator)) evaluated at fixed points:
+//! [`sxy::eval`](super::s::sxy::eval)) evaluated at fixed points:
 //! three independent geometric sequences are assigned to the $a$, $b$, $c$
 //! wires and constraint values are accumulated via Horner's rule. If two
 //! routines produce the same fingerprint, they are structurally equivalent

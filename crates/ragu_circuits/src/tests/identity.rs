@@ -1232,70 +1232,41 @@ fn test_wire_collision_metrics_identical() {
 // are artifacts of this leak, not of the missing-count or
 // wire-collision design issues.
 
-/// Bug: `fingerprint_routine` does not clear `available_b` after input
-/// remapping, so a routine whose first operation is `alloc` sees a stale
-/// b-wire from the input gate.  `Counter::routine` (used by `eval`)
-/// correctly clears it, producing a different fingerprint for the same
-/// routine.
-///
-/// ```text
-///  fingerprint_routine          Counter::routine (eval)
-///  ──────────────────────       ──────────────────────────
-///  map input: mul→(2,3,5)       map input: mul→(2,3,5)
-///  available_b = Some(3)        available_b = None  ← cleared
-///
-///  MixedConstraints.execute:    MixedConstraints.execute:
-///  aux = alloc → takes 3        aux = alloc → mul→(4,9,25) → a=4
-///  square:  mul→(4,9,25)        square:  mul→(8,27,125)
-///    enforce(4−2=2)               enforce(8−2=6)
-///    enforce(9−2=7)               enforce(27−2=25)
-///  enforce(sq=25)                enforce(sq=125)
-///  s = 172                       s = 594
-/// ```
+/// `fingerprint_routine` (standalone) and `fingerprint_via_eval`
+/// (production path through `Counter::routine`) must agree for every
+/// `Element → Element` test routine.
 #[test]
-fn test_fingerprint_routine_disagrees_with_eval() {
-    // SquareOnce: first op is mul (via square), available_b irrelevant.
-    assert_eq!(
-        fingerprint_elem(&SquareOnce),
-        fingerprint_via_eval(&SquareOnce),
-    );
-
-    // MixedConstraints: first op is alloc, stale available_b changes
-    // wire values.  The two paths SHOULD agree but don't.
-    assert_eq!(
-        fingerprint_elem(&MixedConstraints),
-        fingerprint_via_eval(&MixedConstraints),
-    );
-}
-
-/// Bug: `fingerprint_routine` disagrees with `eval` for every
-/// alloc-first routine because the stale `available_b` shifts wire
-/// values.  Each pair below is correctly distinguished by `eval`
-/// (scalars differ) but falsely aliased by `fingerprint_routine`.
-///
-/// ```text
-///  Routine                   fingerprint_routine   eval
-///  ────────────────────────  ───────────────────   ────
-///  AllocThenEnforce                     scalar 4   scalar 9
-///  AllocThenAddEnforce                  scalar 6   scalar 11
-///  DelegateEnforceLocal                 scalar 4   scalar 9
-/// ```
-#[test]
-fn test_available_b_leak_shifts_alloc_first_routines() {
-    assert_eq!(
-        fingerprint_elem(&AllocThenEnforce),
-        fingerprint_via_eval(&AllocThenEnforce),
-    );
-    assert_eq!(
-        fingerprint_elem(&AllocThenAddEnforce),
-        fingerprint_via_eval(&AllocThenAddEnforce),
-    );
-    // DelegateEnforceLocal: first op after delegation is alloc
-    // (for _consume_b), so the stale available_b also shifts it.
-    assert_eq!(
-        fingerprint_elem(&DelegateEnforceLocal),
-        fingerprint_via_eval(&DelegateEnforceLocal),
-    );
+fn test_cross_path_consistency() {
+    macro_rules! check {
+        ($($routine:expr),+ $(,)?) => {
+            $(assert_eq!(
+                fingerprint_elem(&$routine),
+                fingerprint_via_eval(&$routine),
+                concat!("cross-path mismatch for ", stringify!($routine)),
+            );)+
+        };
+    }
+    check![
+        SquareOnce,
+        SquareOnceAlias,
+        PureNesting,
+        NestingWithExtra,
+        LinearOnly,
+        MixedConstraints,
+        TripleNesting,
+        NestThenSquare,
+        NestThenAdd,
+        DelegateThenEnforce,
+        AllocThenEnforce,
+        AllocOnly,
+        DelegateThenAddEnforce,
+        AllocThenAddEnforce,
+        SquareOnceWithLeadingTrivial,
+        DelegateEnforceChild,
+        DelegateEnforceLocal,
+        DelegatePadEnforceOutput,
+        DelegateAllocEnforceFirst,
+    ];
 }
 
 /// The two genuine design bugs persist through `eval`: missing
