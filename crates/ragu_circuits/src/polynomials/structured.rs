@@ -10,74 +10,33 @@ use core::borrow::Borrow;
 use super::Rank;
 
 /// Represents the $2^k = 4n$ coefficients of a polynomial for a particular
-/// [`Rank`] as four (sparse) vectors $\mathbf{w}, \mathbf{v}, \mathbf{u},
+/// [`Rank`] as four (sparse) vectors $\mathbf{a}, \mathbf{b}, \mathbf{c},
 /// \mathbf{d} \in \mathbb{F}^n$.
 ///
 /// The represented polynomial is given by
 ///
-/// $$ p(X) = \sum_{i=0}^{n-1} \big( \mathbf{w}_i X^{i} + \mathbf{v}_i
-/// X^{2n-1-i} + \mathbf{u}_i X^{2n+i} + \mathbf{d}_i X^{4n - 1 - i} \big) $$
+/// $$ p(X) = \sum_{i=0}^{n-1} \big( \mathbf{c}_i X^{i} + \mathbf{b}_i
+/// X^{2n-1-i} + \mathbf{a}_i X^{2n+i} + \mathbf{d}_i X^{4n - 1 - i} \big) $$
 ///
-/// ## Coefficient layout
-///
-/// To see how the four vectors map to coefficient positions, consider $n = 4$
-/// (so $4n = 16$ coefficients). Expanding the sum term by term:
-///
-/// ```text
-///  i | w_i X^i  | v_i X^{2n-1-i} | u_i X^{2n+i} | d_i X^{4n-1-i}
-/// ---|----------|-----------------|---------------|----------------
-///  0 | w_0 X^0  | v_0 X^7         | u_0 X^8       | d_0 X^15
-///  1 | w_1 X^1  | v_1 X^6         | u_1 X^9       | d_1 X^14
-///  2 | w_2 X^2  | v_2 X^5         | u_2 X^10      | d_2 X^13
-///  3 | w_3 X^3  | v_3 X^4         | u_3 X^11      | d_3 X^12
-/// ```
-///
-/// Reading off the coefficients in order of increasing power gives:
-///
-/// ```text
-/// position: 0    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15
-/// coeff:    w_0  w_1  w_2  w_3  v_3  v_2  v_1  v_0  u_0  u_1  u_2  u_3  d_3  d_2  d_1  d_0
-///           |--- w (ascend) ---||-- v (descend) --||--- u (ascend) ----||--- d (descend) --|
-/// ```
-///
-/// Notice the pattern: **w** and **u** are stored in natural order (ascending index),
-/// while **v** and **d** are stored in reversed order (descending index).
-///
-/// In compact notation: $\vec{p} = [\vec{w} \| \hat{v} \| \vec{u} \| \hat{d}]$,
-/// where $\hat{v}$ denotes $\vec{v}$ with elements in reversed order.
-///
-/// ## Efficient reversal
-///
-/// Reversing all $4n$ coefficients gives:
-///
-/// ```text
-/// position: 0    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15
-/// coeff:    d_0  d_1  d_2  d_3  u_3  u_2  u_1  u_0  v_0  v_1  v_2  v_3  w_3  w_2  w_1  w_0
-///           |--- d (ascend) ---||-- u (descend) --||--- v (ascend) ----||--- w (descend) --|
-/// ```
-///
-/// This is exactly the same layout with $\mathbf{u} \leftrightarrow \mathbf{v}$
-/// and $\mathbf{w} \leftrightarrow \mathbf{d}$. So reversing a polynomial of
-/// degree $4n$ requires **no data movement** — we simply swap which vectors
-/// play which roles (and reverse their read direction).
+/// such that when the coefficients are reversed, the resulting polynomial is
+/// represented by the same vectors with $\mathbf{a}$ swapped with $\mathbf{b}$,
+/// and $\mathbf{c}$ swapped with $\mathbf{d}$.
 ///
 /// ## Usage
 ///
 /// Given a [`Polynomial`] you can obtain a [`View`] of the polynomial from the
 /// standard perspective using [`Polynomial::forward`], which exposes only the
-/// $\mathbf{u}, \mathbf{v}, \mathbf{w}$ coefficient vectors. Alternatively, you
+/// $\mathbf{a}, \mathbf{b}, \mathbf{c}$ coefficient vectors. Alternatively, you
 /// can obtain a view of the polynomial with its coefficients reversed. Only
 /// using a [`View`] can the coefficient vectors be accessed and mutated.
-///
-/// The [`View`] exposes vectors named `a`, `b`, `c` which map to the internal
-/// vectors depending on perspective:
-///
-/// | Perspective | a   | b   | c   |
-/// |-------------|-----|-----|-----|
-/// | Forward     | `u` | `v` | `w` |
-/// | Backward    | `v` | `u` | `d` |
 #[derive(Clone, Debug)]
 pub struct Polynomial<F: Field, R: Rank> {
+    // Note: We use `u`, `v`, `w`, and `d` to represent the coefficient vectors
+    // in the general polynomial so they cannot be confused with the vectors in
+    // the structured `View`.
+    //
+    // In the forward perspective, a -> u, b -> v, c -> w, and in the backward
+    // perspective, a -> v, b -> u, c -> d.
     pub(super) u: Vec<F>,
     pub(super) v: Vec<F>,
     pub(super) w: Vec<F>,
@@ -162,21 +121,6 @@ impl<F: Field, R: Rank> Polynomial<F, R> {
     }
 
     /// Inner product of `self` with the reversed `other`.
-    ///
-    /// Given a structured polynomial
-    /// P(x) = \sum_{i=0}^{n-1} (w_i x^i + v_i x^{2n-1-i} + u_i x^{2n+i} + d_i x^{4n-1-i})
-    /// the coefficient vector is coeffs(P) = (w || rev(v) || u || rev(d)).
-    /// Similarly for Q, coeffs(Q) = (w' || rev(v') || u' || rev(d')).
-    ///
-    /// Reversing Q gives rev(coeffs(Q)) = (d' || rev(u') || v' || rev(w')), so
-    ///
-    /// revdot(P, Q) = <(w || rev(v) || u || rev(d)), (d' || rev(u') || v' || rev(w'))>
-    ///              = <w, d'> + <rev(v), rev(u')> + <u, v'> + <rev(d), rev(w')>
-    ///
-    /// Since <rev(a), rev(b)> = <a, b>
-    /// (see the [arithmetization chapter](https://tachyon.z.cash/ragu/protocol/core/arithmetization.html))
-    ///
-    /// revdot(P, Q) = <u, v'> + <v, u'> + <w, d'> + <d, w'>
     pub fn revdot(&self, other: &Self) -> F {
         self.u
             .iter()
