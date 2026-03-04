@@ -23,15 +23,16 @@
 //! accidentally including it in equivalence maps.
 //!
 //! The scalar is the routine's $s(X,Y)$ contribution (see
-//! [`sxy::eval`](super::s::sxy::eval)) evaluated at fixed points:
-//! three independent geometric sequences are assigned to the $a$, $b$, $c$
-//! wires and constraint values are accumulated via Horner's rule. If two
-//! routines produce the same fingerprint, they are structurally equivalent
-//! with overwhelming probability.
+//! [`sxy::eval`](super::s::sxy::eval)) evaluated at deterministic
+//! pseudorandom points derived from a domain-separated BLAKE2b hash: three
+//! independent geometric sequences are assigned to the $a$, $b$, $c$ wires and
+//! constraint values are accumulated via Horner's rule. If two routines produce
+//! the same fingerprint, they are structurally equivalent with overwhelming
+//! probability.
 //!
 //! [`TypeId`]: core::any::TypeId
 
-use ff::{Field, PrimeField};
+use ff::{Field, FromUniformBytes, PrimeField};
 use ragu_arithmetic::Coeff;
 use ragu_core::{
     Result,
@@ -251,13 +252,23 @@ struct Counter<F> {
     one: F,
 }
 
-impl<F: PrimeField> Counter<F> {
-    // TODO: derive evaluation points from a deterministic random seed.
+impl<F: PrimeField + FromUniformBytes<64>> Counter<F> {
     fn new() -> Self {
-        let x0 = F::from(2);
-        let x1 = F::from(3);
-        let x2 = F::from(5);
-        let y = F::from(7);
+        let point = |index: u8| {
+            F::from_uniform_bytes(
+                blake2b_simd::Params::new()
+                    .personal(b"ragu_counter____")
+                    .to_state()
+                    .update(&[index])
+                    .finalize()
+                    .as_array(),
+            )
+        };
+
+        let x0 = point(0);
+        let x1 = point(1);
+        let x2 = point(2);
+        let y = point(3);
 
         Self {
             scope: CounterScope {
@@ -293,7 +304,7 @@ impl<F: Field> DriverTypes for Counter<F> {
     type LCenforce = WireEvalSum<F>;
 }
 
-impl<'dr, F: PrimeField> Driver<'dr> for Counter<F> {
+impl<'dr, F: PrimeField + FromUniformBytes<64>> Driver<'dr> for Counter<F> {
     type F = F;
     type Wire = WireEval<F>;
     const ONE: Self::Wire = WireEval::One;
@@ -424,7 +435,9 @@ impl<'dr, F: PrimeField> Driver<'dr> for Counter<F> {
 /// Allows [`Counter`] to receive input wires from any driver with the same
 /// field type. Each source wire is mapped to a fresh allocation on the counter,
 /// producing linearly independent wire values for the input gadget.
-impl<'dr, F: PrimeField, D: Driver<'dr, F = F>> FromDriver<'dr, '_, D> for Counter<F> {
+impl<'dr, F: PrimeField + FromUniformBytes<64>, D: Driver<'dr, F = F>> FromDriver<'dr, '_, D>
+    for Counter<F>
+{
     type NewDriver = Self;
 
     fn convert_wire(&mut self, _: &D::Wire) -> Result<WireEval<F>> {
@@ -450,7 +463,7 @@ pub(crate) fn fingerprint_routine<'dr, F, D, Ro>(
     input: &Bound<'dr, D, Ro::Input>,
 ) -> Result<RoutineIdentity>
 where
-    F: PrimeField,
+    F: PrimeField + FromUniformBytes<64>,
     D: Driver<'dr, F = F>,
     Ro: Routine<F>,
 {
@@ -480,7 +493,9 @@ where
 }
 
 /// Evaluates the constraint topology of a circuit.
-pub fn eval<F: PrimeField, C: Circuit<F>>(circuit: &C) -> Result<CircuitMetrics> {
+pub fn eval<F: PrimeField + FromUniformBytes<64>, C: Circuit<F>>(
+    circuit: &C,
+) -> Result<CircuitMetrics> {
     let mut collector = Counter::<F>::new();
     let mut degree_ky = 0usize;
 

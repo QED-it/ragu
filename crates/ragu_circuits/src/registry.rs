@@ -84,13 +84,13 @@ pub struct RegistryBuilder<'params, F: PrimeField, R: Rank> {
     application_steps: Vec<Box<dyn CircuitObject<F, R> + 'params>>,
 }
 
-impl<F: PrimeField, R: Rank> Default for RegistryBuilder<'_, F, R> {
+impl<F: PrimeField + FromUniformBytes<64>, R: Rank> Default for RegistryBuilder<'_, F, R> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'params, F: PrimeField, R: Rank> RegistryBuilder<'params, F, R> {
+impl<'params, F: PrimeField + FromUniformBytes<64>, R: Rank> RegistryBuilder<'params, F, R> {
     /// Creates a new empty [`Registry`] builder.
     pub fn new() -> Self {
         Self {

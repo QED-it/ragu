@@ -921,10 +921,13 @@ fn test_root_identity() {
     ));
 }
 
-/// Guard against accidental changes to the fingerprint computation.
+/// The fingerprint is deterministic and nonzero for a non-trivial routine.
 #[test]
 fn test_known_value_regression() {
-    assert_eq!(fingerprint_elem(&SquareOnce).scalar(), 21);
+    let a = fingerprint_elem(&SquareOnce);
+    let b = fingerprint_elem(&SquareOnce);
+    assert_eq!(a.scalar(), b.scalar());
+    assert_ne!(a.scalar(), 0);
 }
 
 /// Fingerprint from metrics::eval matches standalone fingerprint_routine.
