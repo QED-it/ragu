@@ -1,5 +1,6 @@
-//! Property tests verifying that `metrics::eval` and `rx::eval` produce
-//! segments in the same DFS order with matching multiplication-gate counts.
+//! Property tests verifying that [`crate::metrics::eval`] and [`crate::rx::eval`]
+//! agree on segment count and per-segment multiplication-gate counts, confirming
+//! that both evaluators traverse the routine call tree in identical DFS order.
 
 use proptest::prelude::*;
 use ragu_arithmetic::Coeff;
@@ -16,10 +17,12 @@ use crate::Circuit;
 /// Maximum number of wire allocations generated at any one point in a scope.
 const MAX_ALLOCS: usize = 6;
 /// Maximum number of child routine calls per scope.
-const MAX_CHILDREN: usize = 4;
+const MAX_CHILDREN: u32 = 4;
 /// Maximum nesting depth of the generated routine tree.
 const MAX_DEPTH: u32 = 4;
-/// Maximum total number of `RoutineTree` entries across the whole tree.
+/// Target total number of `RoutineTree` nodes across the whole tree (passed as
+/// `expected_branch_count` to `prop_recursive`; proptest uses this as a
+/// generation budget, not a hard cap).
 const MAX_TREE_SIZE: u32 = 30;
 
 /// A `RoutineTree` describes the structure of a single routine scope: how many
@@ -27,9 +30,11 @@ const MAX_TREE_SIZE: u32 = 30;
 /// are called, and whether this routine's `predict()` returns `Known` or
 /// `Unknown`.
 ///
-/// The `predict_known` flag lets proptest cover all four combinations of outer
-/// and inner prediction modes, exercising both the deferred-parallel path
-/// (`Known`) and the synchronous path (`Unknown`) at every nesting level.
+/// When `prediction_is_known` is `true` the routine takes the deferred path in
+/// [`crate::rx`] (returning `Known` from `predict`); when `false` it takes the
+/// synchronous path (returning `Unknown`). Proptest exercises both values at
+/// every nesting level, covering all combinations of outer and inner prediction
+/// modes that arise in generated trees.
 ///
 /// The execution order within one scope is:
 ///
@@ -42,8 +47,9 @@ const MAX_TREE_SIZE: u32 = 30;
 /// │   └─ (children[1] scope, recursively)
 /// ├─ [children[1].post_allocs]  alloc alloc …
 /// ⋮
-/// └─ call children[n]
-///    [children[n].post_allocs]  alloc alloc …
+/// ├─ call children[n]
+/// │   └─ (children[n] scope, recursively)
+/// └─ [children[n].post_allocs]  alloc alloc …
 /// ```
 #[derive(Debug, Clone)]
 struct RoutineTree {
@@ -55,27 +61,46 @@ struct RoutineTree {
     children: Vec<(RoutineTree, usize)>,
     /// When `true`, `predict()` returns `Known` (deferred parallel path).
     /// When `false`, `predict()` returns `Unknown` (synchronous path).
-    predict_known: bool,
+    ///
+    /// Note: only meaningful when this `RoutineTree` is used as a child
+    /// (wrapped in `TreeRoutine`). The root node's `prediction_is_known` is
+    /// never consulted because `TreeCircuit` synthesizes directly without
+    /// dispatching through `Routine::predict`.
+    prediction_is_known: bool,
 }
 
 fn arb_tree() -> impl Strategy<Value = RoutineTree> {
-    let leaf = (0usize..MAX_ALLOCS, any::<bool>()).prop_map(|(n, predict_known)| RoutineTree {
-        pre_allocs: n,
-        children: vec![],
-        predict_known,
-    });
-    leaf.prop_recursive(MAX_DEPTH, MAX_TREE_SIZE, MAX_CHILDREN as u32, |inner| {
+    let leaf =
+        (0usize..=MAX_ALLOCS, any::<bool>()).prop_map(|(n, prediction_is_known)| RoutineTree {
+            pre_allocs: n,
+            children: vec![],
+            prediction_is_known,
+        });
+    leaf.prop_recursive(MAX_DEPTH, MAX_TREE_SIZE, MAX_CHILDREN, |inner| {
         (
-            0usize..MAX_ALLOCS,
-            proptest::collection::vec((inner, 0usize..MAX_ALLOCS), 0..MAX_CHILDREN),
+            0usize..=MAX_ALLOCS,
+            proptest::collection::vec((inner, 0usize..=MAX_ALLOCS), 0..=MAX_CHILDREN as usize),
             any::<bool>(),
         )
-            .prop_map(|(pre_allocs, children, predict_known)| RoutineTree {
+            .prop_map(|(pre_allocs, children, prediction_is_known)| RoutineTree {
                 pre_allocs,
                 children,
-                predict_known,
+                prediction_is_known,
             })
     })
+}
+
+fn drive_tree<'dr, D: Driver<'dr, F = Fp>>(dr: &mut D, tree: &RoutineTree) -> Result<()> {
+    for _ in 0..tree.pre_allocs {
+        dr.alloc(|| Ok(Coeff::One))?;
+    }
+    for (child, post_allocs) in &tree.children {
+        dr.routine(TreeRoutine(child.clone()), ())?;
+        for _ in 0..*post_allocs {
+            dr.alloc(|| Ok(Coeff::One))?;
+        }
+    }
+    Ok(())
 }
 
 #[derive(Clone)]
@@ -92,15 +117,7 @@ impl Routine<Fp> for TreeRoutine {
         _input: Bound<'dr, D, Self::Input>,
         _aux: DriverValue<D, Self::Aux<'dr>>,
     ) -> Result<Bound<'dr, D, Self::Output>> {
-        for _ in 0..self.0.pre_allocs {
-            dr.alloc(|| Ok(Coeff::One))?;
-        }
-        for (child, post_allocs) in &self.0.children {
-            dr.routine(TreeRoutine(child.clone()), ())?;
-            for _ in 0..*post_allocs {
-                dr.alloc(|| Ok(Coeff::One))?;
-            }
-        }
+        drive_tree(dr, &self.0)?;
         Ok(())
     }
 
@@ -109,7 +126,7 @@ impl Routine<Fp> for TreeRoutine {
         _dr: &mut D,
         _input: &Bound<'dr, D, Self::Input>,
     ) -> Result<Prediction<Bound<'dr, D, Self::Output>, DriverValue<D, Self::Aux<'dr>>>> {
-        if self.0.predict_known {
+        if self.0.prediction_is_known {
             Ok(Prediction::Known((), D::just(|| ())))
         } else {
             Ok(Prediction::Unknown(D::just(|| ())))
@@ -147,26 +164,18 @@ impl Circuit<Fp> for TreeCircuit {
     where
         Self: 'dr,
     {
-        for _ in 0..self.0.pre_allocs {
-            dr.alloc(|| Ok(Coeff::One))?;
-        }
-        for (child, post_allocs) in &self.0.children {
-            dr.routine(TreeRoutine(child.clone()), ())?;
-            for _ in 0..*post_allocs {
-                dr.alloc(|| Ok(Coeff::One))?;
-            }
-        }
+        drive_tree(dr, &self.0)?;
         Ok(((), D::just(|| ())))
     }
 }
 
 proptest! {
-    /// Checks that `metrics::eval` and `rx::eval` produce the same number of
-    /// segments in the same DFS order, with matching multiplication-gate counts.
+    /// Checks that [`crate::metrics::eval`] and [`crate::rx::eval`] agree on
+    /// segment count and per-segment multiplication-gate counts.
     ///
-    /// The two evaluators are implemented independently; this test verifies
-    /// that both traverse routine call trees in identical DFS order and
-    /// agree on how many multiplication gates each segment contains.
+    /// The two evaluators are implemented independently. Agreement confirms
+    /// that both traverse the routine call tree in the same DFS order and
+    /// apply consistent segment-boundary rules.
     #[test]
     fn segment_dfs_order(tree in arb_tree()) {
         let circuit = TreeCircuit(tree);
