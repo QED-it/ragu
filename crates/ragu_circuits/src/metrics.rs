@@ -22,10 +22,12 @@
 //! traits, forcing callers to explicitly handle the root variant rather than
 //! accidentally including it in equivalence maps.
 //!
-//! The fingerprint is computed by assigning three independent geometric
-//! sequences to the $a$, $b$, $c$ wires and accumulating constraint values via
-//! Horner's rule. If two routines produce the same fingerprint, they are
-//! structurally equivalent with overwhelming probability.
+//! The scalar is the routine's $s(X,Y)$ contribution (see
+//! [`sxy::Evaluator`](super::s::sxy::Evaluator)) evaluated at fixed points:
+//! three independent geometric sequences are assigned to the $a$, $b$, $c$
+//! wires and constraint values are accumulated via Horner's rule. If two
+//! routines produce the same fingerprint, they are structurally equivalent
+//! with overwhelming probability.
 //!
 //! [`TypeId`]: core::any::TypeId
 
@@ -250,7 +252,7 @@ struct Counter<F> {
 }
 
 impl<F: PrimeField> Counter<F> {
-    /// Creates a new counter with fixed NUMS constants.
+    // TODO: derive evaluation points from a deterministic random seed.
     fn new() -> Self {
         let x0 = F::from(2);
         let x1 = F::from(3);
@@ -375,15 +377,13 @@ impl<'dr, F: PrimeField> Driver<'dr> for Counter<F> {
             },
         );
 
-        // Map input wires from parent's binding to fresh wires in the reset
-        // scope. Counting is disabled because these gates exist solely to seed
-        // the geometric sequences for fingerprinting.
+        // Remap input wires to fixed positions in the fresh scope so the
+        // fingerprint captures only internal structure, not caller context.
+        // Uncounted: these gates only seed the geometric sequences.
         self.counting = false;
         let new_input = Ro::Input::map_gadget(&input, self)?;
         self.counting = true;
-        // Clear residual pairing state from input remapping so that
-        // execute starts with available_b = None, matching sxy/rx.
-        self.scope.available_b = None;
+        self.scope.available_b = None; // match sxy/rx initial state
 
         // Predict and execute.
         let mut dummy = Emulator::wireless();
