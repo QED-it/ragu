@@ -25,7 +25,7 @@ pub fn eval<F: Field, C: Circuit<F>>(circuit: &C, instance: C::Instance<'_>) -> 
 
     Ok(pubinputs
         .into_iter()
-        .map(|x| x.wire().clone().value())
+        .map(|x| *x.wire())
         .chain(Some(F::ONE))
         .rev()
         .collect())

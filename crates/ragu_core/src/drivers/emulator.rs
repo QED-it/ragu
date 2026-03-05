@@ -104,78 +104,12 @@ pub trait Mode {
 /// Wired mode always has witness availability (i.e., `MaybeKind = Always<()>`).
 pub struct Wired<F: Field>(PhantomData<F>);
 
-/// Container for a [`Field`] element representing a wire assignment.
-///
-/// Wire values are exposed through [`Emulator::wires`].
-pub enum WiredValue<F: Field> {
-    /// The special wire representing the constant $1$.
-    One,
-
-    /// A wire with an assigned value.
-    Assigned(F),
-}
-
-impl<F: Field> WiredValue<F> {
-    /// Retrieves the underlying wire assignment value.
-    pub fn value(self) -> F {
-        match self {
-            WiredValue::One => F::ONE,
-            WiredValue::Assigned(value) => value,
-        }
-    }
-
-    /// Retrieves a reference to the underlying wire value.
-    fn snag<'a>(&'a self, one: &'a F) -> &'a F {
-        match self {
-            WiredValue::One => one,
-            WiredValue::Assigned(value) => value,
-        }
-    }
-}
-
-impl<F: Field> Clone for WiredValue<F> {
-    fn clone(&self) -> Self {
-        match self {
-            WiredValue::One => WiredValue::One,
-            WiredValue::Assigned(value) => WiredValue::Assigned(*value),
-        }
-    }
-}
-
-/// Implementation of [`LinearExpression`] for wired mode's [`DirectSum`].
-pub struct WiredDirectSum<F: Field>(DirectSum<F>);
-
-impl<F: Field> LinearExpression<WiredValue<F>, F> for WiredDirectSum<F> {
-    fn add_term(self, wire: &WiredValue<F>, coeff: Coeff<F>) -> Self {
-        WiredDirectSum(self.0.add_term(wire.snag(&F::ONE), coeff))
-    }
-
-    fn gain(self, coeff: Coeff<F>) -> Self {
-        WiredDirectSum(self.0.gain(coeff))
-    }
-
-    fn extend(self, with: impl IntoIterator<Item = (WiredValue<F>, Coeff<F>)>) -> Self {
-        WiredDirectSum(
-            self.0
-                .extend(with.into_iter().map(|(wire, coeff)| (wire.value(), coeff))),
-        )
-    }
-
-    fn add(self, wire: &WiredValue<F>) -> Self {
-        WiredDirectSum(self.0.add(wire.snag(&F::ONE)))
-    }
-
-    fn sub(self, wire: &WiredValue<F>) -> Self {
-        WiredDirectSum(self.0.sub(wire.snag(&F::ONE)))
-    }
-}
-
 impl<F: Field> Mode for Wired<F> {
     type MaybeKind = Always<()>;
     type F = F;
-    type Wire = WiredValue<F>;
-    type LCadd = WiredDirectSum<F>;
-    type LCenforce = WiredDirectSum<F>;
+    type Wire = F;
+    type LCadd = DirectSum<F>;
+    type LCenforce = DirectSum<F>;
 }
 
 /// Mode for an [`Emulator`] that does not track wire assignments.
@@ -214,8 +148,8 @@ impl<F: Field> Emulator<Wired<F>> {
             type Src = Emulator<Wired<F>>;
             type Dst = PhantomData<F>;
 
-            fn convert_wire(&mut self, wire: &WiredValue<F>) -> Result<()> {
-                self.wires.push(wire.clone().value());
+            fn convert_wire(&mut self, wire: &F) -> Result<()> {
+                self.wires.push(*wire);
                 Ok(())
             }
         }
@@ -348,11 +282,11 @@ impl<'dr, M: MaybeKind, F: Field> Driver<'dr> for Emulator<Wireless<M, F>> {
 
 impl<'dr, F: Field> Driver<'dr> for Emulator<Wired<F>> {
     type F = F;
-    type Wire = WiredValue<F>;
-    const ONE: Self::Wire = WiredValue::One;
+    type Wire = F;
+    const ONE: Self::Wire = F::ONE;
 
     fn constant(&mut self, coeff: Coeff<Self::F>) -> Self::Wire {
-        WiredValue::Assigned(coeff.value())
+        coeff.value()
     }
 
     fn mul(
@@ -364,16 +298,12 @@ impl<'dr, F: Field> Driver<'dr> for Emulator<Wired<F>> {
         // Despite wires existing, the emulator does not enforce multiplication
         // constraints.
 
-        Ok((
-            WiredValue::Assigned(a.value()),
-            WiredValue::Assigned(b.value()),
-            WiredValue::Assigned(c.value()),
-        ))
+        Ok((a.value(), b.value(), c.value()))
     }
 
     fn add(&mut self, lc: impl Fn(Self::LCadd) -> Self::LCadd) -> Self::Wire {
-        let lc = lc(WiredDirectSum(DirectSum::default()));
-        WiredValue::Assigned(lc.0.value)
+        let lc = lc(DirectSum::default());
+        lc.value
     }
 
     fn enforce_zero(&mut self, _: impl Fn(Self::LCenforce) -> Self::LCenforce) -> Result<()> {
@@ -411,7 +341,7 @@ mod tests {
     use super::*;
     use crate::Result;
     use crate::convert::WireMap;
-    use crate::drivers::{Coeff, Driver, LinearExpression};
+    use crate::drivers::{Coeff, Driver};
     use crate::maybe::Always;
     use ff::Field;
     use ragu_pasta::Fp;
@@ -488,9 +418,9 @@ mod tests {
         let w_zero = dr.alloc(|| Ok(Coeff::Zero))?;
         let w_arb = dr.alloc(|| Ok(Coeff::Arbitrary(F::from(42))))?;
 
-        assert_eq!(w_one.value(), F::ONE);
-        assert_eq!(w_zero.value(), F::ZERO);
-        assert_eq!(w_arb.value(), F::from(42));
+        assert_eq!(w_one, F::ONE);
+        assert_eq!(w_zero, F::ZERO);
+        assert_eq!(w_arb, F::from(42));
         Ok(())
     }
 
@@ -504,10 +434,10 @@ mod tests {
         let c_neg = dr.constant(Coeff::NegativeOne);
         let c_arb = dr.constant(Coeff::Arbitrary(F::from(7)));
 
-        assert_eq!(c_one.value(), F::ONE);
-        assert_eq!(c_zero.value(), F::ZERO);
-        assert_eq!(c_neg.value(), -F::ONE);
-        assert_eq!(c_arb.value(), F::from(7));
+        assert_eq!(c_one, F::ONE);
+        assert_eq!(c_zero, F::ZERO);
+        assert_eq!(c_neg, -F::ONE);
+        assert_eq!(c_arb, F::from(7));
         Ok(())
     }
 
@@ -524,9 +454,9 @@ mod tests {
             ))
         })?;
 
-        assert_eq!(a.value(), F::from(3));
-        assert_eq!(b.value(), F::from(5));
-        assert_eq!(c.value(), F::from(99));
+        assert_eq!(a, F::from(3));
+        assert_eq!(b, F::from(5));
+        assert_eq!(c, F::from(99)); // emulator does not enforce a*b==c
         Ok(())
     }
 
@@ -541,7 +471,7 @@ mod tests {
         // 1*w1 + 3*w2 = 10 + 60 = 70
         let sum = dr.add(|lc| lc.add(&w1).add_term(&w2, Coeff::Arbitrary(F::from(3))));
 
-        assert_eq!(sum.value(), F::from(70));
+        assert_eq!(sum, F::from(70));
         Ok(())
     }
 
@@ -644,33 +574,8 @@ mod tests {
         Ok(())
     }
 
-    // WiredValue::One evaluates to F::ONE.
-    #[test]
-    fn wired_value_one_holds_f_one() {
-        assert_eq!(WiredValue::<F>::One.value(), F::ONE);
-    }
+    // ── DirectSum gain factor ───────────────────────────────────────
 
-    // WiredValue::Assigned holds its inner field element.
-    #[test]
-    fn wired_value_assigned_holds_value() {
-        let v = F::from(123);
-        assert_eq!(WiredValue::Assigned(v).value(), v);
-    }
-
-    // WiredDirectSum accumulates a linear combination over WiredValues.
-    #[test]
-    fn wired_direct_sum_linear_combination() {
-        let one = WiredValue::<F>::One;
-        let x = WiredValue::Assigned(F::from(7));
-
-        let lc = WiredDirectSum(DirectSum::default())
-            .add(&one)
-            .add_term(&x, Coeff::Arbitrary(F::from(3)));
-
-        assert_eq!(lc.0.value, F::from(22));
-    }
-
-    // Gain multiplies cumulatively: add(5).gain(2).add(3).gain(-1).add(4) = 3.
     #[test]
     fn direct_sum_gain_factor() {
         let acc = DirectSum::<F>::default()
@@ -746,9 +651,9 @@ mod tests {
             type Src = Emulator<Wired<F>>;
             type Dst = Emulator<Wired<F>>;
 
-            fn convert_wire(&mut self, _wire: &WiredValue<F>) -> Result<WiredValue<F>> {
+            fn convert_wire(&mut self, _wire: &F) -> Result<F> {
                 self.counter += 1;
-                Ok(WiredValue::Assigned(F::from(self.counter)))
+                Ok(F::from(self.counter))
             }
         }
 
@@ -764,12 +669,12 @@ mod tests {
         let mut map = IncrementingMap { counter: 0 };
 
         let mapped1: TwoWires<'_, Emulator<Wired<F>>> = gadget.map(&mut map)?;
-        assert_eq!(mapped1.a.value(), F::from(1));
-        assert_eq!(mapped1.b.value(), F::from(2));
+        assert_eq!(mapped1.a, F::from(1));
+        assert_eq!(mapped1.b, F::from(2));
 
         let mapped2: TwoWires<'_, Emulator<Wired<F>>> = gadget.map(&mut map)?;
-        assert_eq!(mapped2.a.value(), F::from(3));
-        assert_eq!(mapped2.b.value(), F::from(4));
+        assert_eq!(mapped2.a, F::from(3));
+        assert_eq!(mapped2.b, F::from(4));
 
         assert_eq!(map.counter, 4);
         Ok(())
