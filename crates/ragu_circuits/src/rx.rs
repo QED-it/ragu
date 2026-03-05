@@ -11,7 +11,7 @@ use ragu_core::{
     Error, Result,
     convert::{CloneWires, StripWires},
     drivers::{Driver, DriverTypes, emulator::Emulator},
-    gadgets::{Bound, Gadget},
+    gadgets::Bound,
     maybe::{Always, Maybe, MaybeKind},
     routines::{Prediction, Routine},
 };
@@ -300,7 +300,7 @@ impl<'scope, 'env, F: Field> Driver<'env> for Evaluator<'scope, 'env, F> {
                 // Remap the input gadget to a driver-independent representation,
                 // then wrap in `Sendable` to satisfy the `Send` bound on the
                 // thunk closure.
-                let input = input.map(&mut StripWires::default())?.sendable();
+                let input = StripWires::strip(&input)?.sendable();
 
                 self.thunks.push(Thunk(Box::new(move |thunks| {
                     let mut eval = Evaluator::new(child_prefix, thunks);

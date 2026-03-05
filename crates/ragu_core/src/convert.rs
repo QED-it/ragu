@@ -145,6 +145,21 @@ impl<D: DriverTypes> Default for StripWires<D> {
     }
 }
 
+impl<F: Field, D> StripWires<D>
+where
+    D: DriverTypes<ImplField = F>,
+{
+    /// Maps a gadget to a wireless emulator by discarding its wires.
+    pub fn strip<'src, 'dst, G: Gadget<'src, D>>(
+        gadget: &G,
+    ) -> Result<Bound<'dst, Emulator<Wireless<D::MaybeKind, F>>, G::Kind>>
+    where
+        D: Driver<'src, F = F>,
+    {
+        gadget.map(&mut Self::default())
+    }
+}
+
 impl<F: Field, D: DriverTypes<ImplField = F>> WireMap<F> for StripWires<D> {
     type Src = D;
     type Dst = Emulator<Wireless<D::MaybeKind, F>>;
