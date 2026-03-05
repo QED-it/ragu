@@ -72,7 +72,15 @@ pub trait WireMap<F: Field> {
     ) -> Result<<Self::Dst as DriverTypes>::ImplWire>;
 
     /// Maps a gadget from [`Src`](Self::Src) to [`Dst`](Self::Dst) using a
-    /// default-constructed instance of this wire map.
+    /// fresh default instance of this wire map.
+    ///
+    /// The source driver is inferred from the gadget; the destination can be
+    /// inferred from the return context or spelled out explicitly:
+    ///
+    /// ```ignore
+    /// let output: Bound<'_, Dst, _> = MyWireMap::remap(&gadget)?;
+    /// let output = MyWireMap::<_, Dst>::remap(&gadget)?;
+    /// ```
     fn remap<'src, 'dst, G: Gadget<'src, Self::Src>>(
         gadget: &G,
     ) -> Result<Bound<'dst, Self::Dst, G::Kind>>
