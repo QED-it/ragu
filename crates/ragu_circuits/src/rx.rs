@@ -17,28 +17,13 @@ use ragu_core::{
 };
 use ragu_primitives::GadgetExt;
 
-use alloc::{boxed::Box, vec, vec::Vec};
+use alloc::{vec, vec::Vec};
+use std::sync::mpsc;
 
 use super::{
     Circuit, DriverScope, Rank, floor_planner::ConstraintSegment, metrics::SegmentRecord, registry,
     structured,
 };
-
-/// Deferred `execute()` for a Known-predicted routine.
-///
-/// Created when `predict()` returns [`Known`](Prediction::Known), allowing
-/// the main traversal to continue with the predicted output while deferring
-/// the actual witness computation. When invoked, runs `execute()` in a fresh
-/// [`Evaluator`] and returns the resulting trace segments.
-struct Thunk<'env, F: Field>(
-    Box<dyn FnOnce(&mut Vec<Thunk<'env, F>>) -> Result<Vec<AnnotatedSegment<F>>> + Send + 'env>,
-);
-
-impl<'env, F: Field> Thunk<'env, F> {
-    fn run(self, thunks: &mut Vec<Thunk<'env, F>>) -> Result<Vec<AnnotatedSegment<F>>> {
-        (self.0)(thunks)
-    }
-}
 
 /// A contiguous group of multiplication gates.
 ///
@@ -204,17 +189,24 @@ struct TraceScope {
 struct Evaluator<'scope, 'env, F: Field> {
     /// Trace segments produced by this evaluator's routine scope.
     segments: Vec<AnnotatedSegment<F>>,
-    /// Deferred `execute()` closures for Known-predicted routines.
-    thunks: &'scope mut Vec<Thunk<'env, F>>,
-    /// Per-routine state saved and restored across routine boundaries.
+    /// Rayon scope for spawning Known-predicted routine evaluations.
+    scope: &'scope maybe_rayon::Scope<'env>,
+    /// Channel for sending completed segments back to the root collector.
+    tx: mpsc::Sender<Result<Vec<AnnotatedSegment<F>>>>,
+    /// Per-routine state saved and restored by [`DriverScope`].
     state: TraceScope,
 }
 
 impl<'scope, 'env, F: Field> Evaluator<'scope, 'env, F> {
-    fn new(prefix: Vec<usize>, thunks: &'scope mut Vec<Thunk<'env, F>>) -> Self {
+    fn new(
+        prefix: Vec<usize>,
+        scope: &'scope maybe_rayon::Scope<'env>,
+        tx: mpsc::Sender<Result<Vec<AnnotatedSegment<F>>>>,
+    ) -> Self {
         Self {
             segments: vec![AnnotatedSegment::new(&prefix)],
-            thunks,
+            scope,
+            tx,
             state: TraceScope {
                 available_b: None,
                 current_segment: 0,
@@ -296,25 +288,36 @@ impl<'scope, 'env, F: Field> Driver<'env> for Evaluator<'scope, 'env, F> {
 
         match prediction {
             Prediction::Known(predicted_output, aux) => {
+                // Deferred `execute()` for a Known-predicted routine.
+                //
+                // Created when `predict()` returns [`Known`](Prediction::Known),
+                // allowing the main traversal to continue with the predicted
+                // output while deferring the actual witness computation. When
+                // spawned, runs `execute()` in a fresh [`Evaluator`] and sends
+                // the resulting trace segments back through the channel.
                 let output = CloneWires::remap(&predicted_output)?;
                 // Remap the input gadget to a driver-independent representation,
                 // then wrap in `Sendable` to satisfy the `Send` bound on the
-                // thunk closure.
+                // spawn closure.
                 let input = StripWires::remap(&input)?.sendable();
 
-                self.thunks.push(Thunk(Box::new(move |thunks| {
-                    let mut eval = Evaluator::new(child_prefix, thunks);
-                    CloneWires::remap(&input.into_inner())
-                        .and_then(|input| routine.execute(&mut eval, input, aux))
-                        // Discard the output gadget; we already have the predicted output.
-                        .map(|_| {
-                            assert!(
-                                !eval.segments.is_empty(),
-                                "deferred routine must produce at least one segment"
-                            );
-                            eval.segments
-                        })
-                })));
+                let tx = self.tx.clone();
+                self.scope.spawn(move |s| {
+                    let mut eval = Evaluator::new(child_prefix, s, tx.clone());
+                    tx.send(
+                        CloneWires::remap(&input.into_inner())
+                            .and_then(|input| routine.execute(&mut eval, input, aux))
+                            // Discard the output gadget; we already have the predicted output.
+                            .map(|_| {
+                                assert!(
+                                    !eval.segments.is_empty(),
+                                    "deferred routine must produce at least one segment"
+                                );
+                                eval.segments
+                            }),
+                    )
+                    .expect("receiver alive");
+                });
 
                 Ok(output)
             }
@@ -367,10 +370,10 @@ pub fn eval<'witness, F: Field, C: Circuit<F>>(
     circuit: &C,
     witness: C::Witness<'witness>,
 ) -> Result<(Trace<F>, C::Aux<'witness>)> {
-    let mut thunks = Vec::new();
+    let (tx, rx) = mpsc::channel();
 
-    let (mut segments, aux) = {
-        let mut evaluator = Evaluator::new(Vec::new(), &mut thunks);
+    let (mut segments, aux) = maybe_rayon::scope(|s| {
+        let mut evaluator = Evaluator::new(Vec::new(), s, tx);
 
         let aux = {
             let (io, aux) = circuit.witness(&mut evaluator, Always::maybe_just(|| witness))?;
@@ -379,13 +382,12 @@ pub fn eval<'witness, F: Field, C: Circuit<F>>(
         };
 
         Ok((evaluator.segments, aux))
-    }?;
+    })?;
 
-    // Flush deferred execute() calls, popping until all nested
-    // Known thunks are drained.
-    // TODO: thunks are independent and can be evaluated in parallel.
-    while let Some(thunk) = thunks.pop() {
-        segments.extend(thunk.run(&mut thunks)?);
+    // Collect segments from spawned Known-predicted routines, draining
+    // all deferred execute() calls that completed during the scope.
+    for batch in rx {
+        segments.extend(batch?);
     }
 
     Ok((finish(segments), aux))

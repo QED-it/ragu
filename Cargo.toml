@@ -23,6 +23,7 @@ all-features = true
 default = []
 multicore = [
   "ragu_arithmetic/multicore",
+  "ragu_circuits/multicore",
 ]
 
 [lib]

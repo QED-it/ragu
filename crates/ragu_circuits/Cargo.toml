@@ -12,7 +12,7 @@ rust-version.workspace = true
 readme = "README.md"
 repository.workspace = true
 documentation = "https://docs.rs/ragu_circuits"
-categories = ["cryptography", "mathematics", "algorithms", "science", "no-std"]
+categories = ["cryptography", "mathematics", "algorithms", "science"]
 keywords = []
 
 [package.metadata.docs.rs]
@@ -21,6 +21,7 @@ all-features = true
 
 [features]
 default = []
+multicore = ["maybe-rayon/threads", "ragu_arithmetic/multicore"]
 
 [lib]
 bench = false
@@ -33,13 +34,20 @@ group = { workspace = true }
 ragu_core = { path = "../ragu_core", version = "0.0.0" }
 ragu_primitives = { path = "../ragu_primitives", version = "0.0.0" }
 rand = { workspace = true }
+maybe-rayon = { workspace = true }
 
 [dev-dependencies]
 proptest = { workspace = true }
 gungraun = { workspace = true }
+criterion = { workspace = true }
 ragu_pasta = { path = "../ragu_pasta", version = "0.0.0", features = ["baked"] }
 ragu_testing = { path = "../ragu_testing", version = "0.0.0" }
 
 [[bench]]
 name = "circuits"
+harness = false
+
+[[bench]]
+name = "rx_criterion"
+path = "benches/criterion/rx.rs"
 harness = false
