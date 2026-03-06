@@ -64,6 +64,10 @@
 //! pieces of the enclosed value, or reinterpret the enclosed value somehow.
 //! This is done by value in a way that often does not lead to any runtime
 //! overhead due to existing memory layout optimizations in the Rust compiler.
+//!
+//! See also the [book] for a user-oriented introduction to witness handling.
+//!
+//! [book]: https://tachyon.z.cash/ragu/guide/drivers/witness.html
 
 mod always;
 mod cast;

@@ -12,7 +12,10 @@ use super::Coeff;
 /// expression maintains a "gain" factor (initialized to $1$), and every term
 /// added is multiplied by the _current_ gain. The gain can be updated at any
 /// time, affecting only subsequent terms. This is equivalent to scale-and-add
-/// techniques, though it can be more awkward or unfamiliar.
+/// techniques, though it can be more awkward or unfamiliar. See also the
+/// [book].
+///
+/// [book]: https://tachyon.z.cash/ragu/guide/drivers/linear.html
 pub trait LinearExpression<W: Clone, F: Field>: Sized {
     /// This adds a term to the linear expression, described by a wire and an
     /// associated coefficient. Terms being added are always scaled by the

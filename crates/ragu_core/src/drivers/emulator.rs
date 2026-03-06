@@ -65,6 +65,10 @@
 //!
 //! In [`Wired`] mode, wire assignments can be extracted from a gadget using
 //! [`Emulator::wires`], which returns a `Vec<F>` of field elements.
+//!
+//! See also the [book] for a user-oriented introduction to the emulator.
+//!
+//! [book]: https://tachyon.z.cash/ragu/guide/drivers/concrete.html#emulator
 
 use ff::Field;
 

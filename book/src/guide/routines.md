@@ -132,11 +132,17 @@ impl<F: Field> Routine<F> for Txz {
 }
 ```
 
+Although the `predict` method takes a `&mut D` driver, it is witness-oriented by
+design: the driver passed in is always a lightweight stand-in (such as an
+[`Emulator`]) that does not collect or enforce constraints.
+
 Ultimately, the driver decides what to do with the prediction. Drivers that know
 the output ahead of time might skip execution entirely during [emulation], or
 synthesize on the predicted result while collecting the actual trace
 concurrently. Concurrency relies on the fact that `Routine`s implement `Send +
 Clone`.
+
+[`Emulator`]: ragu_core::drivers::emulator::Emulator
 
 ```admonish info
 **When to use a routine.** Wrap a section of circuit code in a `Routine` when

@@ -78,6 +78,10 @@
 //! Gadgets can be composed of other gadgets by definition. Gadgets can even be
 //! polymorphic over gadgets, and some gadgets are even composed of gadgets that
 //! are instantiated with different drivers.
+//!
+//! See also the [book] for a user-oriented introduction to gadgets.
+//!
+//! [book]: https://tachyon.z.cash/ragu/guide/gadgets/
 
 mod foreign;
 

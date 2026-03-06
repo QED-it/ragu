@@ -5,6 +5,10 @@
 //! multiple times (and so drivers can memoize their synthesis) or have
 //! efficiently predictable outputs (and so drivers can parallelize their
 //! synthesis).
+//!
+//! See also the [book] for a user-oriented introduction to routines.
+//!
+//! [book]: https://tachyon.z.cash/ragu/guide/routines.html
 
 use ff::Field;
 

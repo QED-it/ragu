@@ -10,11 +10,7 @@
 //!
 //! [`WireMap`] provides a uniform mechanism for these conversions: an
 //! implementor fixes a source and destination driver via associated types, then
-//! converts wires one at a time. Because [`WireMap`] is a separate trait rather
-//! than an associated type on [`GadgetKind`](crate::gadgets::GadgetKind), the
-//! same gadget kind can be remapped by many different conversion strategies
-//! without adding type parameters to
-//! [`GadgetKind`](crate::gadgets::GadgetKind).
+//! converts wires one at a time.
 //!
 //! ### Public API
 //!
@@ -23,7 +19,9 @@
 //! - [`StripWires`], a [`WireMap`] that discards wire values for use with
 //!   wireless emulators.
 //!
-//! [`Routine::predict`]: crate::routines::Routine::predict
+//! See also the [book] for a user-oriented introduction to conversion.
+//!
+//! [book]: https://tachyon.z.cash/ragu/guide/gadgets/conversion.html
 
 use core::marker::PhantomData;
 use ff::Field;

@@ -42,6 +42,10 @@
 //! performed---permitting aggressive parallelization, memoization and other
 //! optimizations. Routines use [`WireMap`](crate::convert::WireMap) to
 //! translate gadgets from one driver to another during these conversions.
+//!
+//! See also the [book] for a user-oriented introduction to drivers.
+//!
+//! [book]: https://tachyon.z.cash/ragu/guide/drivers/
 
 pub mod emulator;
 mod linexp;
@@ -121,7 +125,10 @@ pub trait DriverTypes {
 /// Drivers are parameterized by a lifetime `'dr`. Routines are constrained to
 /// outlive this lifetime so that references to non-`'static` parameters or
 /// witness data can be placed inside of them while still allowing drivers to
-/// use multithreaded execution.
+/// use multithreaded execution. See the [book section on `'dr`][dr-lifetime]
+/// for more detail.
+///
+/// [dr-lifetime]: https://tachyon.z.cash/ragu/guide/drivers/#the-dr-lifetime
 pub trait Driver<'dr>: DriverTypes<ImplWire = Self::Wire, ImplField = Self::F> + Sized {
     /// The field that this driver operates over.
     type F: Field;
