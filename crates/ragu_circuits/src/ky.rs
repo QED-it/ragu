@@ -24,7 +24,7 @@ pub fn eval<F: Field, C: Circuit<F>>(circuit: &C, instance: C::Instance<'_>, y: 
         .instance(&mut dr, Always::maybe_just(|| instance))?
         .write(&mut dr, &mut ky)?;
 
-    Ok(ky.finish_ky(&mut dr)?.wire().clone().value())
+    Ok(*ky.finish_ky(&mut dr)?.wire())
 }
 
 #[cfg(test)]
