@@ -36,19 +36,10 @@ The [`Bound<'dr, D, K>`][bound-alias] type alias is shorthand for
 
 ## `map_gadget`
 
-Thanks to the strict requirements on implementations of
-[`Gadget`][gadget-trait], it is possible to
-[transform gadgets](index.md#transformations) between drivers. This is
-handled by the
 [`GadgetKind::map_gadget`](ragu_core::gadgets::GadgetKind::map_gadget)
-method implementation for every gadget, which translates the gadget's
-wires and witness information from one driver to another using the
-[`WireMap`][wiremap-trait] trait.
-
-The [`Gadget::map`](ragu_core::gadgets::Gadget::map) is a proxy for its
-corresponding
-[`GadgetKind::map_gadget`](ragu_core::gadgets::GadgetKind::map_gadget)
-method.
+translates a gadget from one driver to another, walking its fields and
+converting wires and witness data to the destination driver. See
+[Conversion](conversion.md) for details.
 
 ## `enforce_equal_gadget`
 
@@ -78,4 +69,4 @@ see it.
 [bound-alias]: ragu_core::gadgets::Bound
 [driver-trait]: ragu_core::drivers::Driver
 [enforce-equal]: ragu_core::gadgets::GadgetKind::enforce_equal_gadget
-[wiremap-trait]: ragu_core::convert::WireMap
+

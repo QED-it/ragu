@@ -148,7 +148,7 @@ output; it would return [`Unknown`] from [`predict`] while optionally providing
 auxiliary data for [`execute`].
 ```
 
-[emulation]: ../implementation/drivers/emulator.md
+[emulation]: drivers/concrete.md#emulator
 [`Aux`]: ragu_core::routines::Routine::Aux
 [`Element`]: ragu_primitives::Element
 [`Prediction`]: ragu_core::routines::Prediction

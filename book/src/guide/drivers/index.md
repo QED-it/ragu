@@ -81,20 +81,6 @@ data to workers without `Arc`.
 The [`enforce_equal()`] method is a convenience helper that constrains two wires
 to have the same value by calling [`enforce_zero()`] on their difference.
 
-## Concrete Drivers
-
-Ragu uses drivers internally to execute circuit code, and users do not need to
-implement or directly interact with drivers except in advanced use cases or test
-code. The most useful drivers that are exposed in the public API are:
-
-* [Emulators](../../implementation/drivers/emulator.md) execute circuit code
-  without enforcing constraints, which is useful when only the correct result is
-  desired and the actual machinery of the arithmetic circuit reduction is
-  irrelevant.
-* [`Simulator`] (in `ragu_primitives`) also executes circuit code but _does_
-  enforce constraints and collects realistic metrics in the process, which is
-  useful for testing.
-
 [`mul()`]: ragu_core::drivers::Driver::mul
 [`enforce_zero()`]: ragu_core::drivers::Driver::enforce_zero
 [`add()`]: ragu_core::drivers::Driver::add
@@ -103,6 +89,5 @@ code. The most useful drivers that are exposed in the public API are:
 [`alloc()`]: ragu_core::drivers::Driver::alloc
 [`Driver`]: ragu_core::drivers::Driver
 [`Routine`]: ragu_core::routines::Routine
-[`Simulator`]: ragu_primitives::Simulator
 [`enforce_equal()`]: ragu_core::drivers::Driver::enforce_equal
 [`Wire`]: ragu_core::drivers::Driver::Wire

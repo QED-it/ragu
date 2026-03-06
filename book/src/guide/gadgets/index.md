@@ -41,13 +41,12 @@ This gadget is a _compositional_ gadget: it contains another gadget (a
 ## [`Gadget`][gadget-trait] trait {#fungibility}
 
 The [`Gadget`][gadget-trait] trait captures the structural guarantees that
-drivers rely on for efficient circuit synthesis. All implementations must
-satisfy the following requirements:
+drivers rely on to [convert](conversion.md) gadgets between driver contexts
+and optimize circuit synthesis. All implementations must satisfy the following
+requirements:
 
 * **They must be fungible.** A gadget's behavior during circuit synthesis must
-  be fully determined by its type, not by any particular instance's state. This
-  ensures that generic code operating on gadgets has stable expectations about
-  how they can be manipulated and transformed between drivers.
+  be fully determined by its type, not by any particular instance's state.
     * Among the consequences of this principle:
         1. Gadgets cannot contain dynamic-length collections (use
            [`FixedVec`][fixedvec-gadget] with a static [`Len`][len-trait]
@@ -75,7 +74,14 @@ satisfy the following requirements:
   necessary anyway, but drivers may need to clone gadgets generically when
   performing various transformations.
 
-### Automatic Derivation
+### `num_wires`
+
+The [`Gadget`][gadget-trait] trait provides a [`num_wires`][num-wires-method]
+method that returns the number of wires contained in a gadget instance. Because
+gadgets are [fungible](#fungibility), this count is determined entirely by the
+type—it is the same for every instance.
+
+### Automatic Derivation {#automatic-derivation}
 
 The requirements above constrain the space of valid implementations tightly
 enough that nearly all [`Gadget`][gadget-trait] implementations can be
@@ -102,10 +108,8 @@ types:
 * **`#[ragu(phantom)]`** - for marker types like `PhantomData`
 * **`#[ragu(gadget)]`** - for fields that are themselves gadgets _(optional)_
 
-**Fields without any annotation default to gadget fields.** You only need
-explicit annotations when mixing gadgets with wires, values, or phantom types.
-If you mistakenly omit an annotation on a wire or value field, the compiler
-will produce a helpful error because those types don't implement `Gadget`.
+Fields without any annotation default to gadget fields, so `#[ragu(gadget)]`
+is only needed for clarity.
 
 [boolean-gadget]: ragu_primitives::Boolean
 [spongestate-gadget]: ragu_primitives::poseidon::SpongeState
@@ -117,19 +121,4 @@ will produce a helpful error because those types don't implement `Gadget`.
 [driver-trait]: ragu_core::drivers::Driver
 [gadget-thread-guarantees]: ragu_core::gadgets::GadgetKind#safety
 [maybe-trait]: ragu_core::maybe::Maybe
-[map-gadget-method]: ragu_core::gadgets::GadgetKind::map_gadget
-[wiremap-trait]: ragu_core::convert::WireMap
-
-### Transformations
-
-Due to the above guarantees, types that implement [`Gadget`][gadget-trait] can
-be transformed between drivers. This is very useful for implementations of
-drivers themselves, which may need to perform deep analysis of a gadget's
-constituent wires for various kinds of optimizations. The primary boundary where
-these optimizations are applied involves the inputs and outputs of
-[routines](../routines.md).
-
-In order to transform a gadget from one driver to another, gadgets provide a
-[`map_gadget`][map-gadget-method] method implementation which uses the
-[`WireMap`][wiremap-trait] to map a gadget's constituent wires and witness
-data to a new [`Driver`][driver-trait].
+[num-wires-method]: ragu_core::gadgets::Gadget::num_wires

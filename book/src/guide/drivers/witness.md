@@ -24,23 +24,26 @@ entirely. `Option<T>` also introduces “missing witness” errors—and the cos
 propagating them—at every point where witness data is manipulated. A correct
 design rules out these failure modes statically.
 
-## `DriverValue<D, T>` and `Maybe<T>` {#driver-value}
+## [`DriverValue<D, T>`] {#driver-value}
 
 For witness data, Ragu replaces `Option<T>` with a type-level mechanism. Each
 driver `D` requires circuit code to interact with witness data through
 [`DriverValue<D, T>`]. This type alias resolves differently depending on the
-driver’s associated [`MaybeKind`] definition:
+driver:
 
-* **`Always`** — the value is present. [`DriverValue<D, T>`] resolves to
+* If the witness must be available, [`DriverValue<D, T>`] resolves to
   `Always<T>`, a `#[repr(transparent)]` wrapper with the same layout as `T`.
-* **`Empty`** — the value is absent. [`DriverValue<D, T>`] resolves to `Empty`,
-  a zero-sized type that carries no data (like `()`). Operations on these values
+* If the witness is not expected, [`DriverValue<D, T>`] resolves to `Empty`, a
+  zero-sized type that carries no data, like `()`. Operations on these values
   are no-ops.
 
-Both types implement the [`Maybe<T>`] trait, which provides a shared interface
-analogous to `Option<T>`. This allows circuit code to manipulate witness values
-generically without knowing which concrete representation it holds. The trait
-methods cover extraction, transformation, and construction:
+## [`Maybe<T>`] {#maybe-trait}
+
+Both `Always<T>` and `Empty` implement the [`Maybe<T>`] trait, which provides a
+shared interface analogous to `Option<T>`. Circuit code manipulates witness
+values through this trait without knowing which concrete representation it
+holds. Its methods cover extraction, transformation, and construction of witness
+values.
 
 ### [`take`], [`as_ref`], [`as_mut`], and [`snag`] {#take-as_ref-snag}
 
@@ -100,6 +103,13 @@ conditional on `T: Clone`, so a dedicated trait method fills the gap. It behaves
 identically to [`Clone::clone`] when the value is present; under `Empty`, it
 returns `Empty`.
 
+## [`MaybeKind`] and the [`Perhaps`] Alias {#generic-code}
+
+Most code that works with [`Maybe<T>`] only needs the trait methods described
+above. Users who need to build abstractions that are themselves generic over
+[`Maybe<T>`] will additionally need the [`MaybeKind`] trait and the [`Perhaps`]
+type alias. These are documented in the [`maybe`] module.
+
 [`just`]: ragu_core::maybe::Maybe::just
 [`with`]: ragu_core::maybe::Maybe::with
 [`map`]: ragu_core::maybe::Maybe::map
@@ -121,4 +131,6 @@ returns `Empty`.
 [`clone`]: ragu_core::maybe::Maybe::clone
 [`Clone`]: core::clone::Clone
 [`Clone::clone`]: core::clone::Clone::clone
+[`Perhaps`]: ragu_core::maybe::Perhaps
+[`maybe`]: ragu_core::maybe
 [`Point`]: ragu_primitives::point::Point
