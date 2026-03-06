@@ -105,7 +105,7 @@ pub trait Maybe<T: Send>: Send {
     /// Mutable counterpart of [`as_ref`](Maybe::as_ref).
     fn as_mut(&mut self) -> Perhaps<Self::Kind, &mut T>;
 
-    /// Helper for `.as_ref().take()` to obtain a reference to the enclosed value
+    /// Shorthand for `.as_ref().take()` to obtain a reference to the enclosed value
     /// in contexts where the `Maybe<T>` is guaranteed to be an existing value.
     /// In other contexts, just as in [`Maybe<T>::take`], this will fail at
     /// compile time.
@@ -166,7 +166,7 @@ pub trait MaybeKind {
     }
 
     /// Creates an empty `Maybe<T>` value for this kind. This will fail at
-    /// compile time for kinds that do not represent existing values.
+    /// compile time for kinds that represent existing values.
     fn empty<T: Send>() -> Self::Rebind<T>;
 }
 
@@ -272,6 +272,7 @@ mod tests {
             }
         }
 
+        // 42 + ((100 + 10) * 2) + 10 = 272
         assert_eq!(
             my_operation::<AlwaysInterface, ()>(Always::<()>::just(|| 42))
                 .unwrap()
@@ -290,5 +291,194 @@ mod tests {
         }
 
         my_operation::<EmptyInterface, ()>(Empty).unwrap();
+    }
+
+    // Generic test helpers parameterized on MaybeKind. Each exercises the
+    // Maybe trait API in a generic context (the primary usage pattern), with
+    // assertions guarded by `K::maybe_just` so they compile away for Empty.
+
+    fn check_just_and_snag<K: MaybeKind>() {
+        let v = K::maybe_just(|| 42usize);
+        K::maybe_just(|| {
+            assert_eq!(v.snag(), &42);
+        });
+    }
+
+    fn check_map<K: MaybeKind>() {
+        let v = K::maybe_just(|| 21usize).map(|x| x * 2);
+        K::maybe_just(|| {
+            assert_eq!(v.snag(), &42);
+        });
+    }
+
+    fn check_and_then<K: MaybeKind>() {
+        let v = K::maybe_just(|| 10usize).and_then(|x| K::maybe_just(|| x + 32));
+        K::maybe_just(|| {
+            assert_eq!(v.snag(), &42);
+        });
+    }
+
+    fn check_as_ref<K: MaybeKind>() {
+        let v = K::maybe_just(|| 42usize);
+        let r = v.as_ref();
+        r.map(|r| assert_eq!(*r, 42));
+    }
+
+    fn check_as_mut<K: MaybeKind>() {
+        let mut v = K::maybe_just(|| 10usize);
+        v.as_mut().map(|r| *r = 42);
+        K::maybe_just(|| {
+            assert_eq!(v.snag(), &42);
+        });
+    }
+
+    fn check_clone<K: MaybeKind>() {
+        let a = K::maybe_just(|| 42usize);
+        let b = Maybe::clone(&a);
+        K::maybe_just(|| {
+            assert_eq!(a.snag(), &42);
+            assert_eq!(b.snag(), &42);
+        });
+    }
+
+    fn check_into<K: MaybeKind>() {
+        let v: Perhaps<K, u64> = Maybe::into(K::maybe_just(|| 42u32));
+        K::maybe_just(|| {
+            assert_eq!(v.snag(), &42u64);
+        });
+    }
+
+    fn check_with_ok<K: MaybeKind>() {
+        let v: Result<Perhaps<K, usize>, &str> = K::maybe_with(|| Ok(42));
+        let v = v.unwrap();
+        K::maybe_just(|| {
+            assert_eq!(v.snag(), &42);
+        });
+    }
+
+    #[test]
+    fn test_just_and_snag() {
+        check_just_and_snag::<Always<()>>();
+        check_just_and_snag::<Empty>();
+    }
+
+    #[test]
+    fn test_map() {
+        check_map::<Always<()>>();
+        check_map::<Empty>();
+    }
+
+    #[test]
+    fn test_and_then() {
+        check_and_then::<Always<()>>();
+        check_and_then::<Empty>();
+    }
+
+    #[test]
+    fn test_as_ref() {
+        check_as_ref::<Always<()>>();
+        check_as_ref::<Empty>();
+    }
+
+    #[test]
+    fn test_as_mut() {
+        check_as_mut::<Always<()>>();
+        check_as_mut::<Empty>();
+    }
+
+    #[test]
+    fn test_clone() {
+        check_clone::<Always<()>>();
+        check_clone::<Empty>();
+    }
+
+    #[test]
+    fn test_into() {
+        check_into::<Always<()>>();
+        check_into::<Empty>();
+    }
+
+    #[test]
+    fn test_with_ok() {
+        check_with_ok::<Always<()>>();
+        check_with_ok::<Empty>();
+    }
+
+    // Concrete tests for impl-specific guarantees that cannot be expressed
+    // generically: take() is only callable on Always, error propagation
+    // requires Always to actually invoke the closure, and Empty tests use
+    // Cell tracking to prove closures are never called.
+
+    #[test]
+    fn test_always_just_and_take() {
+        assert_eq!(Always::<()>::just(|| 42usize).take(), 42);
+    }
+
+    #[test]
+    fn test_always_with_err() {
+        let v: Result<Always<usize>, &str> = Always::<usize>::with(|| Err("fail"));
+        match v {
+            Err(e) => assert_eq!(e, "fail"),
+            Ok(_) => panic!("expected Err"),
+        }
+    }
+
+    #[test]
+    fn test_empty_just_ignores_closure() {
+        use core::cell::Cell;
+        let called = Cell::new(false);
+        let _: Empty = <Empty as Maybe<usize>>::just(|| {
+            called.set(true);
+            999
+        });
+        assert!(!called.get());
+    }
+
+    #[test]
+    fn test_empty_map_ignores_closure() {
+        use core::cell::Cell;
+        let called = Cell::new(false);
+        let _: Empty = <Empty as Maybe<usize>>::just(|| 0).map(|_: usize| {
+            called.set(true);
+            0usize
+        });
+        assert!(!called.get());
+    }
+
+    #[test]
+    fn test_empty_and_then_ignores_closure() {
+        use core::cell::Cell;
+        let called = Cell::new(false);
+        let _: Empty = <Empty as Maybe<usize>>::just(|| 0).and_then::<usize, _>(|_: usize| {
+            called.set(true);
+            Empty
+        });
+        assert!(!called.get());
+    }
+
+    #[test]
+    fn test_empty_with_never_calls_closure() {
+        use core::cell::Cell;
+        let called = Cell::new(false);
+        let v: Result<Empty, &str> = <Empty as Maybe<usize>>::with(|| {
+            called.set(true);
+            Err::<usize, _>("fail")
+        });
+        assert!(!called.get());
+        assert!(v.is_ok());
+    }
+
+    #[test]
+    fn test_always_is_transparent() {
+        assert_eq!(
+            core::mem::size_of::<Always<u64>>(),
+            core::mem::size_of::<u64>()
+        );
+        assert_eq!(core::mem::size_of::<Always<[u8; 32]>>(), 32);
+    }
+
+    #[test]
+    fn test_empty_is_zst() {
+        assert_eq!(core::mem::size_of::<Empty>(), 0);
     }
 }
