@@ -76,6 +76,11 @@ pub enum RoutineIdentity {
 /// the low 64 bits of the field element produced by running the routine's
 /// synthesis on the `Counter` driver.
 ///
+/// The 64-bit truncation gives ~2^{-64} collision probability per pair,
+/// adequate for floor-planner equivalence classes. If fingerprints are
+/// ever used for security-critical decisions, store the full field
+/// representation (`[u8; 32]`) instead — the cost is negligible.
+///
 /// [`TypeId`]: core::any::TypeId
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RoutineFingerprint {
