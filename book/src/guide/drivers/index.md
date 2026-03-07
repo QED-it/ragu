@@ -27,7 +27,7 @@ The driver exposes three core operations:
 * [`mul()`]: returns wires $(a, b, c)$ with the initial constraint $a \cdot b =
       c$, simultaneously assigning their values. The caller provides a closure
       that returns the three assignments; it is evaluated only in contexts where
-      witness data is needed.
+      [witness data](witness.md) is needed.
 * [`enforce_zero()`]: enforces that a linear combination of previously created
       wires equals zero. This operation takes a closure that is only executed
       when the driver needs to know about the constraint system. The closure is
@@ -76,6 +76,21 @@ thread scope's lifetime lets routines hold borrowed references and send auxiliar
 data to workers without `Arc`.
 ```
 
+### `DriverTypes` {#drivertypes}
+
+`Driver<'dr>` has a supertrait, [`DriverTypes`], that collects associated types
+which can be named without binding the `'dr` lifetime. The field type
+`ImplField` and wire type `ImplWire` are re-exported on `Driver` as
+[`F`][driver-f] and [`Wire`], but the remaining associated types (`MaybeKind`,
+`LCadd`, and `LCenforce`) live only on `DriverTypes` because circuit code rarely
+needs to refer to them by name.
+
+The lifetime-free aspect lets conversion infrastructure (see the
+[`convert`][convert-mod] module) and the [`DriverValue`] type alias work without
+a driver lifetime in scope. Circuit code should always use `Driver<'dr>` as its
+bound directly; `DriverTypes` only matters when writing lifetime-polymorphic
+abstractions over drivers.
+
 ### Equality
 
 The [`enforce_equal()`] method is a convenience helper that constrains two wires
@@ -91,3 +106,7 @@ to have the same value by calling [`enforce_zero()`] on their difference.
 [`Routine`]: ragu_core::routines::Routine
 [`enforce_equal()`]: ragu_core::drivers::Driver::enforce_equal
 [`Wire`]: ragu_core::drivers::Driver::Wire
+[`DriverTypes`]: ragu_core::drivers::DriverTypes
+[driver-f]: ragu_core::drivers::Driver::F
+[convert-mod]: ragu_core::convert
+[`DriverValue`]: ragu_core::drivers::DriverValue

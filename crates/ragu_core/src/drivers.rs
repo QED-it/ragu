@@ -68,8 +68,25 @@ pub use linexp::{DirectSum, LinearExpression};
 /// and private data.
 pub type DriverValue<D, T> = Perhaps<<D as DriverTypes>::MaybeKind, T>;
 
-/// Defines implementation types for a concrete driver. Users of drivers do not
-/// need to directly interact with this trait.
+/// Associated types for a [`Driver`] that can be named without binding the
+/// `'dr` lifetime.
+///
+/// `Driver<'dr>` re-exports some of these types (as [`Driver::F`] and
+/// [`Driver::Wire`]) but deliberately omits others:
+/// [`MaybeKind`](Self::MaybeKind), [`LCadd`](Self::LCadd), and
+/// [`LCenforce`](Self::LCenforce) are implementation details that circuit code
+/// rarely needs to mention by name. Placing them here keeps `Driver<'dr>`
+/// focused on its core API while still making the types available to
+/// infrastructure that needs them.
+///
+/// The lifetime-free aspect is equally important: the [`DriverValue`] type
+/// alias and [wire-map conversions](crate::convert) both reference
+/// `DriverTypes` associated types without requiring `'dr`, so they can be
+/// defined and used in contexts where no driver lifetime is in scope.
+///
+/// Circuit code should bound on `Driver<'dr>`, not `DriverTypes`. This trait is
+/// relevant when writing conversion helpers or other abstractions that must be
+/// lifetime-polymorphic over drivers.
 pub trait DriverTypes {
     /// The field that this driver operates over.
     type ImplField: Field;
@@ -81,12 +98,20 @@ pub trait DriverTypes {
     /// expects.
     type MaybeKind: MaybeKind;
 
-    /// The concrete linear expression type that this driver uses for obtaining
-    /// sum for addition gates.
+    /// The concrete [`LinearExpression`] type used by [`Driver::add`].
+    ///
+    /// Because `add` accepts a closure `Fn(Self::LCadd) -> Self::LCadd`, Rust
+    /// requires the expression type to be named in the trait hierarchy even
+    /// though circuit code never refers to it directly. See the
+    /// [book](https://tachyon.z.cash/ragu/guide/drivers/linear.html#the-closure-pattern)
+    /// for detail on the closure pattern.
     type LCadd: LinearExpression<Self::ImplWire, Self::ImplField>;
 
-    /// The concrete linear expression type that this driver uses for obtaining
-    /// sums for linear constraints.
+    /// The concrete [`LinearExpression`] type used by [`Driver::enforce_zero`].
+    ///
+    /// Exposed for the same reason as [`LCadd`](Self::LCadd): Rust requires
+    /// the concrete type to appear in the trait hierarchy because
+    /// `enforce_zero` accepts a closure parameterized over it.
     type LCenforce: LinearExpression<Self::ImplWire, Self::ImplField>;
 }
 
@@ -129,6 +154,18 @@ pub trait DriverTypes {
 /// for more detail.
 ///
 /// [dr-lifetime]: https://tachyon.z.cash/ragu/guide/drivers/#the-dr-lifetime
+///
+/// # Supertrait: `DriverTypes`
+///
+/// `Driver<'dr>` requires [`DriverTypes`], which collects the associated types
+/// that can be named without binding `'dr`. Some of those types (`ImplField`,
+/// `ImplWire`) are re-exported here as [`F`](Self::F) and [`Wire`](Self::Wire);
+/// others ([`MaybeKind`](DriverTypes::MaybeKind),
+/// [`LCadd`](DriverTypes::LCadd), [`LCenforce`](DriverTypes::LCenforce))
+/// remain on `DriverTypes` only, since circuit code rarely needs to refer to
+/// them. Infrastructure that must name a driver's types without binding
+/// `'dr`—see the [`convert`](crate::convert) module—bounds on `DriverTypes`
+/// instead.
 pub trait Driver<'dr>: DriverTypes<ImplWire = Self::Wire, ImplField = Self::F> + Sized {
     /// The field that this driver operates over.
     type F: Field;

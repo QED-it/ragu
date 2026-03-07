@@ -15,7 +15,8 @@ preserved.
 
 The [`WireMap`][wiremap-trait] trait provides a pluggable strategy for these
 conversions. Implementors fix a source and destination driver via associated
-types and define a method for transforming wires between them one at a time:
+types and define a method for transforming wires between them one at a
+time.[^drivertypes]
 
 ```rust,ignore
 pub trait WireMap<F: Field> {
@@ -110,6 +111,13 @@ their input on a wireless emulator so they can compute predicted outputs
 without a real synthesis context. [`StripWires`][stripwires-type] handles the
 conversion from the caller's driver to that emulator automatically.
 
+[^drivertypes]: `Src` and `Dst` are bounded by [`DriverTypes`][drivertypes-trait],
+    not `Driver<'dr>`, so `WireMap` itself carries no lifetime parameter. The
+    full `Driver<'dr>` bound is introduced on individual methods where the
+    lifetime is actually needed. See
+    [`DriverTypes`](../drivers/index.md#drivertypes) for more on this split.
+
+[drivertypes-trait]: ragu_core::drivers::DriverTypes
 [wiremap-trait]: ragu_core::convert::WireMap
 [convert-wire]: ragu_core::convert::WireMap::convert_wire
 [clonewires-type]: ragu_core::convert::CloneWires
