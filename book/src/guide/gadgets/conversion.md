@@ -1,17 +1,21 @@
 # Conversion
 
-Drivers often need to substitute wires in a gadget, inspect its internal layout,
-or move it into a different [driver](../drivers/index.md) context. Conversion
-supports all of these through a visitor that walks a gadget's wire tree, passing
-each wire through a pluggable (possibly stateful) transformation.
-[Fungibility](index.md#fungibility) guarantees that the result is a valid gadget
-of the same kind, with structure and semantics preserved.
+Ragu often needs to substitute wires in a gadget, inspect its internal layout,
+or move it from one [driver](../drivers/index.md) context to another. All of
+these operations rely on a single visitor pattern.
+
+Gadgets enable this with a provided [`map_gadget`][map-gadget-method] method
+that traverses the gadget's own fields with the assistance of a (possibly
+stateful) transformation. This produces a new gadget parameterized by a
+different concrete driver, and [fungibility](index.md#fungibility) guarantees
+that the result is a valid gadget of the same kind, with structure and semantics
+preserved.
 
 ## [`WireMap`][wiremap-trait]
 
-The [`WireMap`][wiremap-trait] trait provides a uniform mechanism for these
-conversions. An implementor fixes a source and destination driver via associated
-types and defines a strategy for transforming wires between them one at a time:
+The [`WireMap`][wiremap-trait] trait provides a pluggable strategy for these
+conversions. Implementors fix a source and destination driver via associated
+types and define a method for transforming wires between them one at a time:
 
 ```rust,ignore
 pub trait WireMap<F: Field> {
@@ -25,20 +29,59 @@ pub trait WireMap<F: Field> {
 }
 ```
 
-[`GadgetKind::map_gadget`][map-gadget-method] performs the actual traversal,
-walking the gadget's fields and dispatching each one according to its kind.
-`Wire` fields go through [`convert_wire`][convert-wire], `DriverValue` fields
-are reconstructed via [`Maybe::just`][maybe-just] (preserving or discarding
-witness data according to the destination driver's
-[`MaybeKind`][maybekind-trait]), and nested gadget fields recurse. The
-[`Gadget::map`][gadget-map] method is a convenience proxy for
-[`map_gadget`][map-gadget-method].
+The only type-level constraint is that source and destination drivers share the
+same field `F`. [`GadgetKind::map_gadget`][map-gadget-method] performs the
+actual traversal, walking the gadget's fields and dispatching each one according
+to its kind. `Wire` fields go through [`convert_wire`][convert-wire],
+`DriverValue` fields are reconstructed via [`Maybe::just`][maybe-just]
+(preserving or discarding witness data according to the destination driver's
+[`MaybeKind`][maybekind-trait]), and nested gadget fields recurse.
 
 ```admonish tip
-[`WireMap`][wiremap-trait] also provides a [`remap`][remap-method] shorthand
-for wire maps that implement [`Default`]: it constructs a fresh instance and
-maps the gadget in one call. All built-in wire maps support this.
+The [`Gadget::map`][gadget-map] method is a convenience proxy for
+[`map_gadget`][map-gadget-method]. [`WireMap`][wiremap-trait] also provides a
+[`remap`][remap-method] shorthand for wire maps that implement [`Default`].
 ```
+
+## Statefulness {#statefulness}
+
+Some wire maps need only the wire itself, but others must remember where they
+are in the traversal or accumulate results across calls. The mutable receiver
+makes both cases possible without any external bookkeeping.
+
+A concrete illustration is [`Gadget::num_wires`][num-wires-method], which
+internally counts a gadget's wires by defining a single-purpose
+[`WireMap`][wiremap-trait] whose [`convert_wire`][convert-wire] increments a
+counter:
+
+```rust,ignore
+struct WireCounter<Src: DriverTypes> {
+    count: usize,
+    _marker: PhantomData<Src>,
+}
+
+impl<F: Field, Src: DriverTypes<ImplField = F>> WireMap<F>
+    for WireCounter<Src>
+{
+    type Src = Src;
+    type Dst = PhantomData<F>;
+
+    fn convert_wire(&mut self, _: &Src::ImplWire) -> Result<()> {
+        self.count += 1;
+        Ok(())
+    }
+}
+```
+
+The counter's `Dst` is `PhantomData<F>`, whose wire type is `()`. The counter
+discards every wire and keeps only the tally, and the resulting gadget is
+discarded.
+
+In contrast, wire injection during [staging](../../implementation/staging.md)
+(another process internal to Ragu) feeds pre-allocated wires into specific
+positions in the constraint trace, populating a gadget with those wires. The
+[`WireMap`][wiremap-trait] for this operation is stateful so that it will yield
+the next wire on each `convert_wire` call.
 
 ## [`CloneWires`][clonewires-type]
 
@@ -49,6 +92,11 @@ the destination driver's context:
 ```rust,ignore
 let output: Bound<'dst, DstDriver, _> = CloneWires::remap(&gadget)?;
 ```
+
+This strategy is useful for [demotion][gadgetext-demote]. Internally, a demoted
+gadget uses [`CloneWires`][clonewires-type] to preserve wires and strip witness
+data. The corresponding [`promote`][demoted-promote] method allows the original
+gadget to be restored.
 
 ## [`StripWires`][stripwires-type]
 
@@ -67,10 +115,12 @@ conversion from the caller's driver to that emulator automatically.
 [clonewires-type]: ragu_core::convert::CloneWires
 [stripwires-type]: ragu_core::convert::StripWires
 [remap-method]: ragu_core::convert::WireMap::remap
-[gadgetkind-trait]: ragu_core::gadgets::GadgetKind
 [map-gadget-method]: ragu_core::gadgets::GadgetKind::map_gadget
 [gadget-map]: ragu_core::gadgets::Gadget::map
+[num-wires-method]: ragu_core::gadgets::Gadget::num_wires
 [maybe-just]: ragu_core::maybe::Maybe::just
 [maybekind-trait]: ragu_core::maybe::MaybeKind
 [`Default`]: core::default::Default
 [`Emulator`]: ragu_core::drivers::emulator::Emulator
+[gadgetext-demote]: ragu_primitives::GadgetExt::demote
+[demoted-promote]: ragu_primitives::promotion::Demoted::promote

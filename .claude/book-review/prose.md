@@ -16,6 +16,15 @@ consistency, capitalization, etc.), the following book-specific rules apply.
 - Defined terms from `book/src/appendix/terminology.md` take precedence over
   any ad hoc term choices.
 
+## Concept Introduction
+
+- When introducing a mechanism, frame it from the subject's existing
+  capability ("Gadgets know how to traverse their own wires") rather than
+  from the feature's perspective ("Conversion supports X through Y"). The
+  former grounds the reader in something already understood and leads
+  naturally into the mechanism; the latter presents an abstract feature
+  acting on behalf of an unnamed need.
+
 ## Transitions
 
 - Each paragraph should connect to the preceding one. Flag abrupt topic shifts
