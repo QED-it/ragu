@@ -975,19 +975,6 @@ fn test_output_remapping_preserves_parent() {
     );
 }
 
-// These tests exercise pairs of structurally different routines that
-// previously produced identical fingerprints due to one or more of:
-//
-//   1. Constraint counts (mul, lin) absent from the fingerprint tuple.
-//   2. `available_b` not cleared after input remapping in
-//      `fingerprint_routine`, causing stale pairing state to shift
-//      subsequent wire positions.
-//   3. Zero-valued Horner initial accumulator, which made leading empty
-//      `enforce_zero` calls invisible.
-//
-// All three bugs have been fixed.  The tests remain as regression guards
-// — each `assert_ne!` confirms the pair is correctly distinguished.
-
 /// Delegation + enforce vs local alloc + enforce.  Differs in mul count
 /// (0 vs 1) and scalar (output remap wire vs local alloc wire have
 /// distinct geometric values).
@@ -1038,21 +1025,12 @@ fn test_aliasing_leading_trivial_linear_constraints() {
 fn test_aliasing_metrics_confirm_different_structure() {
     let m1 = metrics::eval(&SingleRoutineCircuit(DelegateThenEnforce)).unwrap();
     let m2 = metrics::eval(&SingleRoutineCircuit(AllocThenEnforce)).unwrap();
-
-    // DelegateThenEnforce has a child segment (SquareOnce), AllocThenEnforce does not.
     assert_ne!(m1.segments.len(), m2.segments.len());
 
     let m3 = metrics::eval(&SingleRoutineCircuit(PureNesting)).unwrap();
     let m4 = metrics::eval(&SingleRoutineCircuit(AllocOnly)).unwrap();
-
-    // PureNesting has a child segment, AllocOnly does not.
     assert_ne!(m3.segments.len(), m4.segments.len());
 }
-
-// These tests verify that a remapped child-output wire and a subsequent
-// local allocation receive distinct geometric values.  The output remap
-// (inside `Counter::routine`) advances the parent's geometric sequences,
-// so the next counted `alloc` starts from a later position.
 
 /// Enforces the child output wire vs a local alloc wire.  The output
 /// remap and the subsequent alloc land at different geometric positions,
@@ -1083,12 +1061,8 @@ fn test_delegation_indistinguishable_from_alloc_with_matched_counts() {
 fn test_wire_collision_metrics_identical() {
     let m1 = metrics::eval(&SingleRoutineCircuit(DelegateEnforceChild)).unwrap();
     let m2 = metrics::eval(&SingleRoutineCircuit(DelegateEnforceLocal)).unwrap();
-
-    // Same segment count (root + parent + SquareOnce child).
     assert_eq!(m1.segments.len(), m2.segments.len());
     assert_eq!(m1.segments.len(), 3);
-
-    // Same constraint counts in every segment.
     for (s1, s2) in m1.segments.iter().zip(m2.segments.iter()) {
         assert_eq!(
             s1.num_multiplication_constraints,
@@ -1157,11 +1131,6 @@ fn test_vanishing_leading_trivial_via_eval() {
     );
 }
 
-// The output remap inside `Counter::routine` restores the parent scope
-// and then allocates fresh wires for the child's outputs.  This advances
-// the parent's geometric sequences past the remap positions, so the
-// next counted allocation receives a distinct wire value.
-
 /// DelegatePadEnforceOutput enforces the remapped child output wire;
 /// DelegateAllocEnforceFirst enforces a subsequent local alloc.  The
 /// output remap advances the parent's geometric sequences, giving
@@ -1181,12 +1150,8 @@ fn test_wire_collision_via_eval() {
 fn test_wire_collision_via_eval_metrics_identical() {
     let m1 = metrics::eval(&SingleRoutineCircuit(DelegatePadEnforceOutput)).unwrap();
     let m2 = metrics::eval(&SingleRoutineCircuit(DelegateAllocEnforceFirst)).unwrap();
-
-    // Same segment count (root + parent + SquareOnce child).
     assert_eq!(m1.segments.len(), m2.segments.len());
     assert_eq!(m1.segments.len(), 3);
-
-    // Same constraint counts in every segment.
     for (s1, s2) in m1.segments.iter().zip(m2.segments.iter()) {
         assert_eq!(
             s1.num_multiplication_constraints,
