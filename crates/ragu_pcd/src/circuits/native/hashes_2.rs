@@ -75,7 +75,7 @@ use core::marker::PhantomData;
 
 use super::{
     stages::{error_n as native_error_n, preamble as native_preamble},
-    unified::{self, Coverage, OutputBuilder},
+    unified::{self, OutputBuilder},
 };
 use crate::components::fold_revdot;
 
@@ -114,8 +114,9 @@ impl<'params, C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Para
 /// [`error_n`](super::stages::error_n) stage witness needed to resume
 /// the Fiat-Shamir transcript from the saved sponge state.
 pub struct Witness<'a, C: Cycle, FP: fold_revdot::Parameters> {
-    /// The unified instance containing expected challenge values.
-    pub unified_instance: &'a unified::Instance<C>,
+    /// The unified instance containing expected challenge values and
+    /// accumulated coverage from prior circuits.
+    pub unified: unified::Instance<C>,
 
     /// Witness for the [`error_n`](super::stages::error_n) stage
     /// (unenforced).
@@ -132,7 +133,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Parameters>
     type Instance<'source> = &'source unified::Instance<C>;
     type Witness<'source> = Witness<'source, C, FP>;
     type Output = unified::InternalOutputKind<C>;
-    type Aux<'source> = Coverage;
+    type Aux<'source> = unified::Instance<C>;
 
     fn instance<'dr, 'source: 'dr, D: Driver<'dr, F = C::CircuitField>>(
         &self,
@@ -163,8 +164,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Parameters>
 
         let error_n = error_n.unenforced(dr, witness.as_ref().map(|w| w.error_n_witness))?;
 
-        let unified_instance = &witness.as_ref().map(|w| w.unified_instance);
-        let mut unified_output = OutputBuilder::new();
+        let mut unified_output = OutputBuilder::new(witness.map(|w| w.unified));
 
         // Resume sponge from saved state (error_m already absorbed in hashes_1)
         // and squeeze mu (first challenge from error_m absorption)
@@ -178,9 +178,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Parameters>
 
         // Derive (mu_prime, nu_prime) by absorbing nested_error_n_commitment
         let (mu_prime, nu_prime) = {
-            let nested_error_n_commitment = unified_output
-                .nested_error_n_commitment
-                .get(dr, unified_instance)?;
+            let nested_error_n_commitment = unified_output.nested_error_n_commitment.get(dr)?;
             nested_error_n_commitment.write(dr, &mut sponge)?;
             let mu_prime = sponge.squeeze(dr)?;
             let nu_prime = sponge.squeeze(dr)?;
@@ -191,9 +189,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Parameters>
 
         // Derive x by absorbing nested_ab_commitment and squeezing
         let x = {
-            let nested_ab_commitment = unified_output
-                .nested_ab_commitment
-                .get(dr, unified_instance)?;
+            let nested_ab_commitment = unified_output.nested_ab_commitment.get(dr)?;
             nested_ab_commitment.write(dr, &mut sponge)?;
             sponge.squeeze(dr)?
         };
@@ -201,9 +197,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Parameters>
 
         // Derive alpha by absorbing nested_query_commitment and squeezing
         let alpha = {
-            let nested_query_commitment = unified_output
-                .nested_query_commitment
-                .get(dr, unified_instance)?;
+            let nested_query_commitment = unified_output.nested_query_commitment.get(dr)?;
             nested_query_commitment.write(dr, &mut sponge)?;
             sponge.squeeze(dr)?
         };
@@ -211,9 +205,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Parameters>
 
         // Derive u by absorbing nested_f_commitment and squeezing
         let u = {
-            let nested_f_commitment = unified_output
-                .nested_f_commitment
-                .get(dr, unified_instance)?;
+            let nested_f_commitment = unified_output.nested_f_commitment.get(dr)?;
             nested_f_commitment.write(dr, &mut sponge)?;
             sponge.squeeze(dr)?
         };
@@ -221,15 +213,12 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Parameters>
 
         // Derive pre_beta by absorbing nested_eval_commitment and squeezing
         let pre_beta = {
-            let nested_eval_commitment = unified_output
-                .nested_eval_commitment
-                .get(dr, unified_instance)?;
+            let nested_eval_commitment = unified_output.nested_eval_commitment.get(dr)?;
             nested_eval_commitment.write(dr, &mut sponge)?;
             sponge.squeeze(dr)?
         };
         unified_output.pre_beta.set(pre_beta);
 
-        let (output, coverage) = unified_output.finish(dr, unified_instance)?;
-        Ok((output, D::just(move || coverage)))
+        unified_output.finish(dr)
     }
 }

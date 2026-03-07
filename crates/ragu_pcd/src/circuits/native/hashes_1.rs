@@ -94,7 +94,7 @@ use core::marker::PhantomData;
 
 use super::{
     stages::{error_n as native_error_n, preamble as native_preamble},
-    unified::{self, Coverage, OutputBuilder},
+    unified::{self, OutputBuilder},
 };
 use crate::components::{fold_revdot, root_of_unity, suffix::WithSuffix};
 
@@ -161,8 +161,9 @@ impl<'params, C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Para
 /// Combines the unified instance with stage witnesses needed to perform the
 /// Fiat-Shamir derivations and $k(y)$ consistency checks.
 pub struct Witness<'a, C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Parameters> {
-    /// The unified instance containing expected challenge values.
-    pub unified_instance: &'a unified::Instance<C>,
+    /// The unified instance containing expected challenge values and
+    /// accumulated coverage from prior circuits.
+    pub unified: unified::Instance<C>,
 
     /// Witness for the [`preamble`](super::stages::preamble) stage
     /// (unenforced).
@@ -186,7 +187,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Parameters>
     type Instance<'source> = &'source unified::Instance<C>;
     type Witness<'source> = Witness<'source, C, R, HEADER_SIZE, FP>;
     type Output = Kind![C::CircuitField; WithSuffix<'_, _, Output<'_, _, C, HEADER_SIZE>>];
-    type Aux<'source> = Coverage;
+    type Aux<'source> = unified::Instance<C>;
 
     fn instance<'dr, 'source: 'dr, D: Driver<'dr, F = C::CircuitField>>(
         &self,
@@ -223,17 +224,14 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Parameters>
         root_of_unity::enforce(dr, preamble.left.circuit_id.clone(), self.log2_circuits)?;
         root_of_unity::enforce(dr, preamble.right.circuit_id.clone(), self.log2_circuits)?;
 
-        let unified_instance = &witness.as_ref().map(|w| w.unified_instance);
-        let mut unified_output = OutputBuilder::new();
+        let mut unified_output = OutputBuilder::new(witness.map(|w| w.unified));
 
         // Create a single long-lived sponge for all challenge derivations
         let mut sponge = Sponge::new(dr, C::circuit_poseidon(self.params));
 
         // Derive w by absorbing nested_preamble_commitment and squeezing
         let w = {
-            let nested_preamble_commitment = unified_output
-                .nested_preamble_commitment
-                .get(dr, unified_instance)?;
+            let nested_preamble_commitment = unified_output.nested_preamble_commitment.get(dr)?;
             nested_preamble_commitment.write(dr, &mut sponge)?;
             sponge.squeeze(dr)?
         };
@@ -241,9 +239,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Parameters>
 
         // Derive (y, z) by absorbing nested_s_prime_commitment and squeezing twice
         let (y, z) = {
-            let nested_s_prime_commitment = unified_output
-                .nested_s_prime_commitment
-                .get(dr, unified_instance)?;
+            let nested_s_prime_commitment = unified_output.nested_s_prime_commitment.get(dr)?;
             nested_s_prime_commitment.write(dr, &mut sponge)?;
             let y = sponge.squeeze(dr)?;
             let z = sponge.squeeze(dr)?;
@@ -274,9 +270,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Parameters>
 
         // Absorb nested_error_m_commitment and verify saved sponge state
         {
-            let nested_error_m_commitment = unified_output
-                .nested_error_m_commitment
-                .get(dr, unified_instance)?;
+            let nested_error_m_commitment = unified_output.nested_error_m_commitment.get(dr)?;
             nested_error_m_commitment.write(dr, &mut sponge)?;
 
             // save_state() applies a permutation (since there's pending absorbed data)
@@ -290,7 +284,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Parameters>
         // Output headers from preamble + unified instance. Verification with
         // `unified_bridge_ky` ensures preamble headers match ApplicationProof
         // headers.
-        let (unified, coverage) = unified_output.finish_no_suffix(dr, unified_instance)?;
+        let (unified, updated) = unified_output.finish_no_suffix(dr)?;
         let output = Output {
             left_header: preamble.left.output_header,
             right_header: preamble.right.output_header,
@@ -298,6 +292,6 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Parameters>
         };
 
         let zero = Element::zero(dr);
-        Ok((WithSuffix::new(output, zero), D::just(move || coverage)))
+        Ok((WithSuffix::new(output, zero), updated))
     }
 }
