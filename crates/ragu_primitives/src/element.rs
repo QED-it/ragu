@@ -415,6 +415,60 @@ pub fn multiadd<'dr, D: Driver<'dr>>(
     Element::promote(wire, value)
 }
 
+#[cfg(test)]
+mod proptests {
+    use alloc::format;
+
+    use super::*;
+    use ff::PrimeField;
+    use proptest::prelude::*;
+    use ragu_core::maybe::Maybe;
+
+    type F = ragu_pasta::Fp;
+    type Simulator = crate::Simulator<F>;
+
+    fn arb_fe() -> impl Strategy<Value = F> {
+        (any::<u64>(), any::<u64>())
+            .prop_map(|(a, b)| F::from(a) + F::from(b) * F::MULTIPLICATIVE_GENERATOR)
+    }
+
+    proptest! {
+        #[test]
+        fn element_add_sub_roundtrip(a_fe in arb_fe(), b_fe in arb_fe()) {
+            let mut actual = None;
+            Simulator::simulate((a_fe, b_fe), |dr, witness| {
+                let (a, b) = witness.cast();
+                let a = Element::alloc(dr, a)?;
+                let b = Element::alloc(dr, b)?;
+                let sum = a.add(dr, &b);
+                let result = sum.sub(dr, &b);
+                actual = Some(*result.value().take());
+                Ok(())
+            }).map_err(|e| TestCaseError::fail(format!("{e:?}")))?;
+            prop_assert_eq!(actual, Some(a_fe));
+        }
+
+        #[test]
+        fn element_mul_commutative(a_fe in arb_fe(), b_fe in arb_fe()) {
+            let mut actual = None;
+            Simulator::simulate((a_fe, b_fe), |dr, witness| {
+                let (a, b) = witness.cast();
+                let a = Element::alloc(dr, a)?;
+                let b = Element::alloc(dr, b)?;
+                let ab = a.mul(dr, &b)?;
+                let ba = b.mul(dr, &a)?;
+                actual = Some((*ab.value().take(), *ba.value().take()));
+                Ok(())
+            }).map_err(|e| TestCaseError::fail(format!("{e:?}")))?;
+            if let Some((ab, ba)) = actual {
+                prop_assert_eq!(ab, ba);
+            } else {
+                return Err(TestCaseError::fail("missing simulated result"));
+            }
+        }
+    }
+}
+
 #[test]
 fn test_div_nonzero() -> Result<()> {
     type F = ragu_pasta::Fp;

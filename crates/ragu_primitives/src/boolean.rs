@@ -422,6 +422,70 @@ mod tests {
     }
 }
 
+#[cfg(test)]
+mod proptests {
+    use alloc::format;
+
+    use super::*;
+    use proptest::prelude::*;
+    use ragu_core::maybe::Maybe;
+
+    type F = ragu_pasta::Fp;
+    type Simulator = crate::Simulator<F>;
+
+    fn arb_fe() -> impl Strategy<Value = F> {
+        (any::<u64>(), any::<u64>())
+            .prop_map(|(a, b)| F::from(a) + F::from(b) * F::MULTIPLICATIVE_GENERATOR)
+    }
+
+    proptest! {
+        #[test]
+        fn boolean_and_idempotent(a_val in proptest::bool::ANY) {
+            let mut actual = None;
+            Simulator::simulate(a_val, |dr, witness| {
+                let a = Boolean::alloc(dr, witness)?;
+                let result = a.and(dr, &a)?;
+                actual = Some(result.value().take());
+                Ok(())
+            }).map_err(|e| TestCaseError::fail(format!("{e:?}")))?;
+            prop_assert_eq!(actual, Some(a_val));
+        }
+
+        #[test]
+        fn boolean_and_complement(a_val in proptest::bool::ANY) {
+            let mut actual = None;
+            Simulator::simulate(a_val, |dr, witness| {
+                let a = Boolean::alloc(dr, witness)?;
+                let not_a = a.not(dr);
+                let result = a.and(dr, &not_a)?;
+                actual = Some(result.value().take());
+                Ok(())
+            }).map_err(|e| TestCaseError::fail(format!("{e:?}")))?;
+            prop_assert_eq!(actual, Some(false));
+        }
+
+        #[test]
+        fn conditional_select_correctness(
+            cond in proptest::bool::ANY,
+            a_fe in arb_fe(),
+            b_fe in arb_fe(),
+        ) {
+            let expected = if cond { b_fe } else { a_fe };
+            let mut actual = None;
+            Simulator::simulate((cond, a_fe, b_fe), |dr, witness| {
+                let (c, a, b) = witness.cast();
+                let c = Boolean::alloc(dr, c)?;
+                let a = Element::alloc(dr, a)?;
+                let b = Element::alloc(dr, b)?;
+                let result = c.conditional_select(dr, &a, &b)?;
+                actual = Some(*result.value().take());
+                Ok(())
+            }).map_err(|e| TestCaseError::fail(format!("{e:?}")))?;
+            prop_assert_eq!(actual, Some(expected));
+        }
+    }
+}
+
 #[test]
 fn test_multipack_vector() -> Result<()> {
     use alloc::{vec, vec::Vec};

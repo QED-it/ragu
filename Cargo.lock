@@ -831,6 +831,7 @@ dependencies = [
  "ff",
  "group",
  "gungraun",
+ "proptest",
  "ragu_arithmetic",
  "ragu_core",
  "ragu_macros",

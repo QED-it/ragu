@@ -458,6 +458,54 @@ fn test_poly_with_roots() {
     assert_eq!(constant_poly, vec![F::ONE]);
 }
 
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use pasta_curves::Fp as F;
+    use proptest::prelude::*;
+
+    fn arb_fe() -> impl Strategy<Value = F> {
+        (any::<u64>(), any::<u64>())
+            .prop_map(|(a, b)| F::from(a) + F::from(b) * F::MULTIPLICATIVE_GENERATOR)
+    }
+
+    proptest! {
+        #[test]
+        fn eval_dot_equivalence(x in arb_fe(), coeffs in proptest::collection::vec(arb_fe(), 1..32)) {
+            let mut powers = Vec::with_capacity(coeffs.len());
+            let mut p = F::ONE;
+            for _ in 0..coeffs.len() {
+                powers.push(p);
+                p *= x;
+            }
+            prop_assert_eq!(dot(powers.iter(), coeffs.iter()), eval(&coeffs, x));
+        }
+
+        #[test]
+        fn factor_quotient_identity(
+            p in proptest::collection::vec(arb_fe(), 2..16),
+            b in arb_fe(),
+            y in arb_fe(),
+        ) {
+            let q = factor(p.iter().copied(), b);
+            let lhs = eval(&p, y);
+            let rhs = eval(&q, y) * (y - b) + eval(&p, b);
+            prop_assert_eq!(lhs, rhs);
+        }
+
+        #[test]
+        fn geosum_matches_naive(r in arb_fe(), m in 1usize..64) {
+            let mut naive = F::ZERO;
+            let mut power = F::ONE;
+            for _ in 0..m {
+                naive += power;
+                power *= r;
+            }
+            prop_assert_eq!(geosum(r, m), naive);
+        }
+    }
+}
+
 #[test]
 fn test_mul() {
     use pasta_curves::group::{Curve, prime::PrimeCurveAffine};

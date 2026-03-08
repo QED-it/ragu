@@ -276,6 +276,32 @@ fn test_contains() {
     assert!(!domain.contains(F::DELTA));
 }
 
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use pasta_curves::Fp as F;
+    use proptest::prelude::*;
+
+    fn arb_fe() -> impl Strategy<Value = F> {
+        (any::<u64>(), any::<u64>())
+            .prop_map(|(a, b)| F::from(a) + F::from(b) * F::MULTIPLICATIVE_GENERATOR)
+    }
+
+    proptest! {
+        #[test]
+        fn fft_ifft_roundtrip(log2_n in 1u32..=8, seed in arb_fe()) {
+            let domain = Domain::<F>::new(log2_n);
+            let coeffs: Vec<F> = (0..domain.n())
+                .map(|i| seed * F::from((i + 1) as u64))
+                .collect();
+            let mut buf = coeffs.clone();
+            domain.fft(&mut buf);
+            domain.ifft(&mut buf);
+            prop_assert_eq!(buf, coeffs);
+        }
+    }
+}
+
 #[test]
 #[should_panic]
 fn test_domain_exceeds_max_boundary_panics() {

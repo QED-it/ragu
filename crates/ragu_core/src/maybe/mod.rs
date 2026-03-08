@@ -485,4 +485,27 @@ mod tests {
     fn test_empty_is_zst() {
         assert_eq!(core::mem::size_of::<Empty>(), 0);
     }
+
+    mod proptests {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            #[test]
+            fn always_map_identity(v in 0usize..10000) {
+                let original = Always::<()>::just(|| v);
+                let mapped = Always::<()>::just(|| v).map(|x| x);
+                prop_assert_eq!(original.take(), mapped.take());
+            }
+
+            #[test]
+            fn always_map_composition(v in 0usize..10000) {
+                let f = |x: usize| x.wrapping_mul(3);
+                let g = |x: usize| x.wrapping_add(7);
+                let chained = Always::<()>::just(|| v).map(f).map(g).take();
+                let composed = Always::<()>::just(|| v).map(|x| g(f(x))).take();
+                prop_assert_eq!(chained, composed);
+            }
+        }
+    }
 }
