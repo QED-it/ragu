@@ -32,8 +32,9 @@ use header::Header;
 pub use proof::{Pcd, Proof};
 use step::{Step, internal::adapter::Adapter};
 
-/// Domain separation tag for Ragu PCD protocol v1.
-pub(crate) const RAGU_TAG: &[u8] = b"ragu-pcd-v1";
+/// Domain separation tag for Ragu PCD protocol.
+// FIXME: choose a permanent domain separation tag before release.
+pub(crate) const RAGU_TAG: &[u8] = b"FIXME";
 
 /// Builder for an [`Application`] for proof-carrying data.
 pub struct ApplicationBuilder<'params, C: Cycle, R: Rank, const HEADER_SIZE: usize> {
