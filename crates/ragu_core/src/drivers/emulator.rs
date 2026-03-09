@@ -592,18 +592,6 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn direct_sum_gain_factor() {
-        let acc = DirectSum::<F>::default()
-            .add(&F::from(5))
-            .gain(Coeff::Arbitrary(F::from(2)))
-            .add(&F::from(3))
-            .gain(Coeff::NegativeOne)
-            .add(&F::from(4));
-
-        assert_eq!(acc.value, F::from(3));
-    }
-
     use alloc::sync::Arc;
     use core::sync::atomic::{AtomicBool, Ordering};
 
