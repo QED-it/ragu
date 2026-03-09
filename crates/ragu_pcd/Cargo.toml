@@ -27,7 +27,8 @@ all-features = true
 
 [features]
 default = []
-multicore = ["maybe-rayon/threads", "ragu_arithmetic/multicore", "ragu_circuits/multicore"]
+multicore = ["maybe-rayon/threads", "ragu_arithmetic/multicore", "ragu_circuits/multicore", "std"]
+std = []
 
 [lib]
 bench = false

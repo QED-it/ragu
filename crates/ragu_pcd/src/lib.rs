@@ -1,6 +1,6 @@
 //! # `ragu_pcd`
 
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(missing_docs)]
@@ -8,6 +8,8 @@
 #![doc(html_logo_url = "https://tachyon.z.cash/assets/ragu/v1/rustdoc-128x128.png")]
 
 extern crate alloc;
+#[cfg(feature = "multicore")]
+extern crate std;
 
 mod circuits;
 mod components;

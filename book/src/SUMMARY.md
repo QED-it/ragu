@@ -18,6 +18,7 @@
     - [The Kind! Macro](guide/gadgets/kind.md)
     - [Conversion](guide/gadgets/conversion.md)
   - [Routines](guide/routines.md)
+  - [The Primitives Standard Library](guide/standard_library.md) <!-- todo -->
   - [Writing Circuits](guide/writing_circuits.md) <!-- todo -->
   - [Configuration](guide/configuration.md) <!-- todo -->
 - [Part II: Protocol Design]()

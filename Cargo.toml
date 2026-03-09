@@ -24,7 +24,9 @@ default = []
 multicore = [
   "ragu_arithmetic/multicore",
   "ragu_circuits/multicore",
+  "ragu_pcd/multicore",
 ]
+std = []
 
 [lib]
 bench = false

@@ -324,6 +324,7 @@ mod tests {
         ENDOSCALINGS_PER_STEP, EndoscalarStage, EndoscalingStep, EndoscalingStepWitness, InputsLen,
         NumStepsLen, PointsStage, PointsWitness,
     };
+    use alloc::vec::Vec;
     use ff::Field;
     use pasta_curves::group::{Curve, Group, prime::PrimeCurveAffine};
     use ragu_arithmetic::Uendo;

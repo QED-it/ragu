@@ -268,6 +268,7 @@ pub fn fold_two_layer<'dr, D: Driver<'dr>, P: Parameters>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::{vec, vec::Vec};
     use ff::Field;
     use ragu_circuits::polynomials::{TestRank, structured};
     use ragu_core::{drivers::emulator::Emulator, maybe::Maybe};
