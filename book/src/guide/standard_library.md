@@ -1,9 +1,10 @@
 # The Primitives Standard Library
 
-The [`ragu_primitives`] crate serves as a **standard library for circuit
-developers**. While `ragu_core` defines the fundamental `Driver` abstraction
-and related traits, `ragu_primitives` builds on that foundation to provide
-the concrete gadgets and utilities that most circuit code depends on:
+The [`ragu_primitives`] crate is a **standard library for circuit
+developers**. `ragu_core` defines the fundamental `Driver` abstraction
+and related traits; `ragu_primitives` builds on that foundation to
+provide the concrete gadgets and utilities that most circuit code
+depends on:
 
 * **Core gadgets** — [`Element`], [`Boolean`], and [`Point`] provide
   in-circuit representations of field elements, boolean values, and elliptic
@@ -20,7 +21,7 @@ the concrete gadgets and utilities that most circuit code depends on:
   in-memory for testing and debugging without generating proofs.
 * **Gadget utilities** — [demotion and promotion][promotion] for stripping
   and recovering witness data, [consistency enforcement][consistent] for
-  re-checking gadget constraints, and thread-safe wrappers via [`Sendable`].
+  enforcing gadget constraints, and thread-safe wrappers via [`Sendable`].
 
 Most Ragu applications will depend on `ragu_primitives` directly, and the
 user guide covers its gadgets extensively in the chapters that follow.

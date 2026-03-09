@@ -7,7 +7,7 @@
 
 - [Part I: User Guide]()
   - [Requirements](guide/requirements.md)
-  - [The Standard Library](guide/standard_library.md)
+  - [The Primitives Standard Library](guide/standard_library.md)
   - [Getting Started](guide/getting_started.md) <!-- todo -->
   - [Drivers](guide/drivers/index.md)
     - [Witness Data](guide/drivers/witness.md)
