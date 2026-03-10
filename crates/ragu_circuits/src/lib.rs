@@ -28,13 +28,13 @@ mod s;
 pub mod staging;
 mod trivial;
 
-pub use metrics::SegmentRecord;
+pub use metrics::{RoutineFingerprint, RoutineIdentity, SegmentRecord};
 pub use rx::Trace;
 
 #[cfg(test)]
 mod tests;
 
-use ff::Field;
+use ff::{Field, FromUniformBytes};
 use ragu_core::{
     Error, Result,
     drivers::{Driver, DriverValue},
@@ -115,7 +115,7 @@ pub trait Circuit<F: Field>: Sized + Send + Sync {
         Self: 'dr;
 }
 
-/// Extension trait for all circuits.
+/// An extension trait for all circuits.
 pub trait CircuitExt<F: Field>: Circuit<F> {
     /// Given a polynomial [`Rank`], convert this circuit into a boxed
     /// [`CircuitObject`] that provides methods for evaluating the $s(X, Y)$
@@ -123,6 +123,7 @@ pub trait CircuitExt<F: Field>: Circuit<F> {
     fn into_object<'a, R: Rank>(self) -> Result<Box<dyn CircuitObject<F, R> + 'a>>
     where
         Self: 'a,
+        F: FromUniformBytes<64>,
     {
         let metrics = metrics::eval(&self)?;
 

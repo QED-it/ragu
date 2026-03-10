@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 
+mod identity;
 mod segment_order;
 
 use ff::Field;
