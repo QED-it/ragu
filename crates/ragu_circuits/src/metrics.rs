@@ -11,8 +11,9 @@
 //! # Fingerprinting
 //!
 //! A routine's fingerprint is the tuple `(TypeId(Input), TypeId(Output),
-//! eval)`. The [`TypeId`] pairs cheaply narrow equivalence candidates by type;
-//! the scalar confirms structural equivalence via random evaluation
+//! eval, num_mul, num_lc)`. The [`TypeId`] pairs cheaply narrow equivalence
+//! candidates by type; the constraint counts further partition by shape; the
+//! scalar confirms structural equivalence via random evaluation
 //! (Schwartz–Zippel).
 //!
 //! The fingerprint is wrapped in [`RoutineIdentity`], an enum that
