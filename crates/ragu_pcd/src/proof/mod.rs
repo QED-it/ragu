@@ -73,19 +73,19 @@ impl<C: Cycle, R: Rank> Proof<C, R> {
     ) -> &structured::Polynomial<C::CircuitField, R> {
         use RxComponent::*;
         match component {
-            AbA => &self.ab.a_poly,
-            AbB => &self.ab.b_poly,
+            AbA => &self.ab.native.a_poly,
+            AbB => &self.ab.native.b_poly,
             Application => &self.application.rx,
             Hashes1 => &self.circuits.hashes_1_rx,
             Hashes2 => &self.circuits.hashes_2_rx,
             PartialCollapse => &self.circuits.partial_collapse_rx,
             FullCollapse => &self.circuits.full_collapse_rx,
             ComputeV => &self.circuits.compute_v_rx,
-            Preamble => &self.preamble.native_rx,
+            Preamble => &self.preamble.native.rx,
             ErrorM => &self.error_m.native.rx,
             ErrorN => &self.error_n.native.rx,
-            Query => &self.query.native_rx,
-            Eval => &self.eval.native_rx,
+            Query => &self.query.native.rx,
+            Eval => &self.eval.native.rx,
         }
     }
 }
@@ -118,23 +118,31 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> crate::Application<'_, C, R, H
                 commitment: host_commitment,
             },
             preamble: Preamble {
-                native_rx: zero_structured_host.clone(),
-                native_blind: host_blind,
-                native_commitment: host_commitment,
-                nested_rx: zero_structured_nested.clone(),
-                nested_blind,
-                nested_commitment,
+                native: NativePreamble {
+                    rx: zero_structured_host.clone(),
+                    blind: host_blind,
+                    commitment: host_commitment,
+                },
+                bridge: BridgePreamble {
+                    rx: zero_structured_nested.clone(),
+                    blind: nested_blind,
+                    commitment: nested_commitment,
+                },
             },
             s_prime: SPrime {
-                registry_wx0_poly: zero_unstructured.clone(),
-                registry_wx0_blind: host_blind,
-                registry_wx0_commitment: host_commitment,
-                registry_wx1_poly: zero_unstructured.clone(),
-                registry_wx1_blind: host_blind,
-                registry_wx1_commitment: host_commitment,
-                nested_s_prime_rx: zero_structured_nested.clone(),
-                nested_s_prime_blind: nested_blind,
-                nested_s_prime_commitment: nested_commitment,
+                native: NativeSPrime {
+                    registry_wx0_poly: zero_unstructured.clone(),
+                    registry_wx0_blind: host_blind,
+                    registry_wx0_commitment: host_commitment,
+                    registry_wx1_poly: zero_unstructured.clone(),
+                    registry_wx1_blind: host_blind,
+                    registry_wx1_commitment: host_commitment,
+                },
+                bridge: BridgeSPrime {
+                    rx: zero_structured_nested.clone(),
+                    blind: nested_blind,
+                    commitment: nested_commitment,
+                },
             },
             error_m: ErrorM {
                 native: NativeErrorM {
@@ -145,7 +153,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> crate::Application<'_, C, R, H
                     blind: host_blind,
                     commitment: host_commitment,
                 },
-                nested: NestedErrorM {
+                bridge: BridgeErrorM {
                     rx: zero_structured_nested.clone(),
                     blind: nested_blind,
                     commitment: nested_commitment,
@@ -157,62 +165,82 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> crate::Application<'_, C, R, H
                     blind: host_blind,
                     commitment: host_commitment,
                 },
-                nested: NestedErrorN {
+                bridge: BridgeErrorN {
                     rx: zero_structured_nested.clone(),
                     blind: nested_blind,
                     commitment: nested_commitment,
                 },
             },
             ab: AB {
-                a_poly: zero_structured_host.clone(),
-                a_blind: host_blind,
-                a_commitment: host_commitment,
-                b_poly: zero_structured_host.clone(),
-                b_blind: host_blind,
-                b_commitment: host_commitment,
-                c: C::CircuitField::ZERO,
-                nested_rx: zero_structured_nested.clone(),
-                nested_blind,
-                nested_commitment,
+                native: NativeAB {
+                    a_poly: zero_structured_host.clone(),
+                    a_blind: host_blind,
+                    a_commitment: host_commitment,
+                    b_poly: zero_structured_host.clone(),
+                    b_blind: host_blind,
+                    b_commitment: host_commitment,
+                    c: C::CircuitField::ZERO,
+                },
+                bridge: BridgeAB {
+                    rx: zero_structured_nested.clone(),
+                    blind: nested_blind,
+                    commitment: nested_commitment,
+                },
             },
             query: Query {
-                registry_xy_poly: zero_unstructured.clone(),
-                registry_xy_blind: host_blind,
-                registry_xy_commitment: host_commitment,
-                native_rx: zero_structured_host.clone(),
-                native_blind: host_blind,
-                native_commitment: host_commitment,
-                nested_rx: zero_structured_nested.clone(),
-                nested_blind,
-                nested_commitment,
+                native: NativeQuery {
+                    registry_xy_poly: zero_unstructured.clone(),
+                    registry_xy_blind: host_blind,
+                    registry_xy_commitment: host_commitment,
+                    rx: zero_structured_host.clone(),
+                    blind: host_blind,
+                    commitment: host_commitment,
+                },
+                bridge: BridgeQuery {
+                    rx: zero_structured_nested.clone(),
+                    blind: nested_blind,
+                    commitment: nested_commitment,
+                },
             },
             f: F {
-                poly: zero_unstructured.clone(),
-                blind: host_blind,
-                commitment: host_commitment,
-                nested_rx: zero_structured_nested.clone(),
-                nested_blind,
-                nested_commitment,
+                native: NativeF {
+                    poly: zero_unstructured.clone(),
+                    blind: host_blind,
+                    commitment: host_commitment,
+                },
+                bridge: BridgeF {
+                    rx: zero_structured_nested.clone(),
+                    blind: nested_blind,
+                    commitment: nested_commitment,
+                },
             },
             eval: Eval {
-                native_rx: zero_structured_host.clone(),
-                native_blind: host_blind,
-                native_commitment: host_commitment,
-                nested_rx: zero_structured_nested.clone(),
-                nested_blind,
-                nested_commitment,
+                native: NativeEval {
+                    rx: zero_structured_host.clone(),
+                    blind: host_blind,
+                    commitment: host_commitment,
+                },
+                bridge: BridgeEval {
+                    rx: zero_structured_nested.clone(),
+                    blind: nested_blind,
+                    commitment: nested_commitment,
+                },
             },
             p: P {
-                poly: zero_unstructured.clone(),
-                blind: host_blind,
-                commitment: host_commitment,
-                v: C::CircuitField::ZERO,
-                endoscalar_rx: zero_structured_nested.clone(),
-                points_rx: zero_structured_nested.clone(),
-                step_rxs: vec![
-                    zero_structured_nested.clone();
-                    NumStepsLen::<NUM_ENDOSCALING_POINTS>::len()
-                ],
+                native: NativeP {
+                    poly: zero_unstructured.clone(),
+                    blind: host_blind,
+                    commitment: host_commitment,
+                    v: C::CircuitField::ZERO,
+                },
+                nested: NestedP {
+                    endoscalar_rx: zero_structured_nested.clone(),
+                    points_rx: zero_structured_nested.clone(),
+                    step_rxs: vec![
+                        zero_structured_nested.clone();
+                        NumStepsLen::<NUM_ENDOSCALING_POINTS>::len()
+                    ],
+                },
             },
             challenges: Challenges::trivial(),
             circuits: InternalCircuits {

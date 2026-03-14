@@ -1,3 +1,6 @@
+//! Proof component structs, split into `Native*` (host-curve data) and
+//! `Bridge*` (cross-curve data that bridges to the inner verifier).
+
 use ff::Field;
 use ragu_arithmetic::Cycle;
 use ragu_circuits::{
@@ -23,26 +26,46 @@ pub(crate) struct Application<C: Cycle, R: Rank> {
 }
 
 #[derive(Clone)]
-pub(crate) struct Preamble<C: Cycle, R: Rank> {
-    pub(crate) native_rx: structured::Polynomial<C::CircuitField, R>,
-    pub(crate) native_blind: C::CircuitField,
-    pub(crate) native_commitment: C::HostCurve,
-    pub(crate) nested_rx: structured::Polynomial<C::ScalarField, R>,
-    pub(crate) nested_blind: C::ScalarField,
-    pub(crate) nested_commitment: C::NestedCurve,
+pub(crate) struct NativePreamble<C: Cycle, R: Rank> {
+    pub(crate) rx: structured::Polynomial<C::CircuitField, R>,
+    pub(crate) blind: C::CircuitField,
+    pub(crate) commitment: C::HostCurve,
 }
 
 #[derive(Clone)]
-pub(crate) struct SPrime<C: Cycle, R: Rank> {
+pub(crate) struct BridgePreamble<C: Cycle, R: Rank> {
+    pub(crate) rx: structured::Polynomial<C::ScalarField, R>,
+    pub(crate) blind: C::ScalarField,
+    pub(crate) commitment: C::NestedCurve,
+}
+
+#[derive(Clone)]
+pub(crate) struct Preamble<C: Cycle, R: Rank> {
+    pub(crate) native: NativePreamble<C, R>,
+    pub(crate) bridge: BridgePreamble<C, R>,
+}
+
+#[derive(Clone)]
+pub(crate) struct NativeSPrime<C: Cycle, R: Rank> {
     pub(crate) registry_wx0_poly: unstructured::Polynomial<C::CircuitField, R>,
     pub(crate) registry_wx0_blind: C::CircuitField,
     pub(crate) registry_wx0_commitment: C::HostCurve,
     pub(crate) registry_wx1_poly: unstructured::Polynomial<C::CircuitField, R>,
     pub(crate) registry_wx1_blind: C::CircuitField,
     pub(crate) registry_wx1_commitment: C::HostCurve,
-    pub(crate) nested_s_prime_rx: structured::Polynomial<C::ScalarField, R>,
-    pub(crate) nested_s_prime_blind: C::ScalarField,
-    pub(crate) nested_s_prime_commitment: C::NestedCurve,
+}
+
+#[derive(Clone)]
+pub(crate) struct BridgeSPrime<C: Cycle, R: Rank> {
+    pub(crate) rx: structured::Polynomial<C::ScalarField, R>,
+    pub(crate) blind: C::ScalarField,
+    pub(crate) commitment: C::NestedCurve,
+}
+
+#[derive(Clone)]
+pub(crate) struct SPrime<C: Cycle, R: Rank> {
+    pub(crate) native: NativeSPrime<C, R>,
+    pub(crate) bridge: BridgeSPrime<C, R>,
 }
 
 #[derive(Clone)]
@@ -56,7 +79,7 @@ pub(crate) struct NativeErrorM<C: Cycle, R: Rank> {
 }
 
 #[derive(Clone)]
-pub(crate) struct NestedErrorM<C: Cycle, R: Rank> {
+pub(crate) struct BridgeErrorM<C: Cycle, R: Rank> {
     pub(crate) rx: structured::Polynomial<C::ScalarField, R>,
     pub(crate) blind: C::ScalarField,
     pub(crate) commitment: C::NestedCurve,
@@ -65,7 +88,7 @@ pub(crate) struct NestedErrorM<C: Cycle, R: Rank> {
 #[derive(Clone)]
 pub(crate) struct ErrorM<C: Cycle, R: Rank> {
     pub(crate) native: NativeErrorM<C, R>,
-    pub(crate) nested: NestedErrorM<C, R>,
+    pub(crate) bridge: BridgeErrorM<C, R>,
 }
 
 #[derive(Clone)]
@@ -76,7 +99,7 @@ pub(crate) struct NativeErrorN<C: Cycle, R: Rank> {
 }
 
 #[derive(Clone)]
-pub(crate) struct NestedErrorN<C: Cycle, R: Rank> {
+pub(crate) struct BridgeErrorN<C: Cycle, R: Rank> {
     pub(crate) rx: structured::Polynomial<C::ScalarField, R>,
     pub(crate) blind: C::ScalarField,
     pub(crate) commitment: C::NestedCurve,
@@ -85,11 +108,11 @@ pub(crate) struct NestedErrorN<C: Cycle, R: Rank> {
 #[derive(Clone)]
 pub(crate) struct ErrorN<C: Cycle, R: Rank> {
     pub(crate) native: NativeErrorN<C, R>,
-    pub(crate) nested: NestedErrorN<C, R>,
+    pub(crate) bridge: BridgeErrorN<C, R>,
 }
 
 #[derive(Clone)]
-pub(crate) struct AB<C: Cycle, R: Rank> {
+pub(crate) struct NativeAB<C: Cycle, R: Rank> {
     pub(crate) a_poly: structured::Polynomial<C::CircuitField, R>,
     pub(crate) a_blind: C::CircuitField,
     pub(crate) a_commitment: C::HostCurve,
@@ -97,53 +120,103 @@ pub(crate) struct AB<C: Cycle, R: Rank> {
     pub(crate) b_blind: C::CircuitField,
     pub(crate) b_commitment: C::HostCurve,
     pub(crate) c: C::CircuitField,
-    pub(crate) nested_rx: structured::Polynomial<C::ScalarField, R>,
-    pub(crate) nested_blind: C::ScalarField,
-    pub(crate) nested_commitment: C::NestedCurve,
+}
+
+#[derive(Clone)]
+pub(crate) struct BridgeAB<C: Cycle, R: Rank> {
+    pub(crate) rx: structured::Polynomial<C::ScalarField, R>,
+    pub(crate) blind: C::ScalarField,
+    pub(crate) commitment: C::NestedCurve,
+}
+
+#[derive(Clone)]
+pub(crate) struct AB<C: Cycle, R: Rank> {
+    pub(crate) native: NativeAB<C, R>,
+    pub(crate) bridge: BridgeAB<C, R>,
+}
+
+#[derive(Clone)]
+pub(crate) struct NativeQuery<C: Cycle, R: Rank> {
+    pub(crate) registry_xy_poly: unstructured::Polynomial<C::CircuitField, R>,
+    pub(crate) registry_xy_blind: C::CircuitField,
+    pub(crate) registry_xy_commitment: C::HostCurve,
+    pub(crate) rx: structured::Polynomial<C::CircuitField, R>,
+    pub(crate) blind: C::CircuitField,
+    pub(crate) commitment: C::HostCurve,
+}
+
+#[derive(Clone)]
+pub(crate) struct BridgeQuery<C: Cycle, R: Rank> {
+    pub(crate) rx: structured::Polynomial<C::ScalarField, R>,
+    pub(crate) blind: C::ScalarField,
+    pub(crate) commitment: C::NestedCurve,
 }
 
 #[derive(Clone)]
 pub(crate) struct Query<C: Cycle, R: Rank> {
-    pub(crate) registry_xy_poly: unstructured::Polynomial<C::CircuitField, R>,
-    pub(crate) registry_xy_blind: C::CircuitField,
-    pub(crate) registry_xy_commitment: C::HostCurve,
-    pub(crate) native_rx: structured::Polynomial<C::CircuitField, R>,
-    pub(crate) native_blind: C::CircuitField,
-    pub(crate) native_commitment: C::HostCurve,
-    pub(crate) nested_rx: structured::Polynomial<C::ScalarField, R>,
-    pub(crate) nested_blind: C::ScalarField,
-    pub(crate) nested_commitment: C::NestedCurve,
+    pub(crate) native: NativeQuery<C, R>,
+    pub(crate) bridge: BridgeQuery<C, R>,
+}
+
+#[derive(Clone)]
+pub(crate) struct NativeF<C: Cycle, R: Rank> {
+    pub(crate) poly: unstructured::Polynomial<C::CircuitField, R>,
+    pub(crate) blind: C::CircuitField,
+    pub(crate) commitment: C::HostCurve,
+}
+
+#[derive(Clone)]
+pub(crate) struct BridgeF<C: Cycle, R: Rank> {
+    pub(crate) rx: structured::Polynomial<C::ScalarField, R>,
+    pub(crate) blind: C::ScalarField,
+    pub(crate) commitment: C::NestedCurve,
 }
 
 #[derive(Clone)]
 pub(crate) struct F<C: Cycle, R: Rank> {
-    pub(crate) poly: unstructured::Polynomial<C::CircuitField, R>,
+    pub(crate) native: NativeF<C, R>,
+    pub(crate) bridge: BridgeF<C, R>,
+}
+
+#[derive(Clone)]
+pub(crate) struct NativeEval<C: Cycle, R: Rank> {
+    pub(crate) rx: structured::Polynomial<C::CircuitField, R>,
     pub(crate) blind: C::CircuitField,
     pub(crate) commitment: C::HostCurve,
-    pub(crate) nested_rx: structured::Polynomial<C::ScalarField, R>,
-    pub(crate) nested_blind: C::ScalarField,
-    pub(crate) nested_commitment: C::NestedCurve,
+}
+
+#[derive(Clone)]
+pub(crate) struct BridgeEval<C: Cycle, R: Rank> {
+    pub(crate) rx: structured::Polynomial<C::ScalarField, R>,
+    pub(crate) blind: C::ScalarField,
+    pub(crate) commitment: C::NestedCurve,
 }
 
 #[derive(Clone)]
 pub(crate) struct Eval<C: Cycle, R: Rank> {
-    pub(crate) native_rx: structured::Polynomial<C::CircuitField, R>,
-    pub(crate) native_blind: C::CircuitField,
-    pub(crate) native_commitment: C::HostCurve,
-    pub(crate) nested_rx: structured::Polynomial<C::ScalarField, R>,
-    pub(crate) nested_blind: C::ScalarField,
-    pub(crate) nested_commitment: C::NestedCurve,
+    pub(crate) native: NativeEval<C, R>,
+    pub(crate) bridge: BridgeEval<C, R>,
 }
 
 #[derive(Clone)]
-pub(crate) struct P<C: Cycle, R: Rank> {
+pub(crate) struct NativeP<C: Cycle, R: Rank> {
     pub(crate) poly: unstructured::Polynomial<C::CircuitField, R>,
     pub(crate) blind: C::CircuitField,
     pub(crate) commitment: C::HostCurve,
     pub(crate) v: C::CircuitField,
+}
+
+#[derive(Clone)]
+pub(crate) struct NestedP<C: Cycle, R: Rank> {
     pub(crate) endoscalar_rx: structured::Polynomial<C::ScalarField, R>,
     pub(crate) points_rx: structured::Polynomial<C::ScalarField, R>,
     pub(crate) step_rxs: Vec<structured::Polynomial<C::ScalarField, R>>,
+}
+
+#[derive(Clone)]
+pub(crate) struct P<C: Cycle, R: Rank> {
+    pub(crate) native: NativeP<C, R>,
+    pub(crate) nested: NestedP<C, R>,
 }
 
 #[derive(Clone)]

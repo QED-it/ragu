@@ -58,6 +58,24 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
     where
         D: Driver<'dr, F = C::CircuitField>,
     {
+        let native = self.compute_native_ab(rng, a, b, mu_prime, nu_prime)?;
+
+        let bridge = self.compute_bridge_ab(rng, &native)?;
+
+        Ok(proof::AB { native, bridge })
+    }
+
+    fn compute_native_ab<'dr, D, RNG: CryptoRng>(
+        &self,
+        rng: &mut RNG,
+        a: FixedVec<structured::Polynomial<C::CircuitField, R>, NativeN>,
+        b: FixedVec<structured::Polynomial<C::CircuitField, R>, NativeN>,
+        mu_prime: &Element<'dr, D>,
+        nu_prime: &Element<'dr, D>,
+    ) -> Result<proof::NativeAB<C, R>>
+    where
+        D: Driver<'dr, F = C::CircuitField>,
+    {
         let mu_prime = *mu_prime.value().take();
         let nu_prime = *nu_prime.value().take();
         let mu_prime_inv = mu_prime.invert().expect("mu_prime must be non-zero");
@@ -75,16 +93,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
 
         let c = a_poly.revdot(&b_poly);
 
-        let nested_ab_witness = nested::Witness {
-            a: a_commitment,
-            b: b_commitment,
-        };
-        let nested_rx = nested::Stage::<C::HostCurve, R>::rx(&nested_ab_witness)?;
-        let nested_blind = C::ScalarField::random(&mut *rng);
-        let nested_commitment =
-            nested_rx.commit_to_affine(C::nested_generators(self.params), nested_blind);
-
-        Ok(proof::AB {
+        Ok(proof::NativeAB {
             a_poly,
             a_blind,
             a_commitment,
@@ -92,9 +101,26 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
             b_blind,
             b_commitment,
             c,
-            nested_rx,
-            nested_blind,
-            nested_commitment,
+        })
+    }
+
+    fn compute_bridge_ab<RNG: CryptoRng>(
+        &self,
+        rng: &mut RNG,
+        native: &proof::NativeAB<C, R>,
+    ) -> Result<proof::BridgeAB<C, R>> {
+        let nested_ab_witness = nested::Witness {
+            a: native.a_commitment,
+            b: native.b_commitment,
+        };
+        let rx = nested::Stage::<C::HostCurve, R>::rx(&nested_ab_witness)?;
+        let blind = C::ScalarField::random(&mut *rng);
+        let commitment = rx.commit_to_affine(C::nested_generators(self.params), blind);
+
+        Ok(proof::BridgeAB {
+            rx,
+            blind,
+            commitment,
         })
     }
 }

@@ -1,4 +1,4 @@
-//! Evaluates $f(X)$.
+//! Construct and commit to $f(X)$.
 //!
 //! This creates the [`proof::F`] component of the proof, which is a
 //! multi-quotient polynomial that witnesses the correct evaluations of every
@@ -46,6 +46,33 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
     where
         D: Driver<'dr, F = C::CircuitField>,
     {
+        let native = self.compute_native_f(
+            rng, w, y, z, x, alpha, s_prime, error_m, ab, query, left, right,
+        )?;
+
+        let bridge = self.compute_bridge_f(rng, &native)?;
+
+        Ok(proof::F { native, bridge })
+    }
+
+    fn compute_native_f<'dr, D, RNG: CryptoRng>(
+        &self,
+        rng: &mut RNG,
+        w: &Element<'dr, D>,
+        y: &Element<'dr, D>,
+        z: &Element<'dr, D>,
+        x: &Element<'dr, D>,
+        alpha: &Element<'dr, D>,
+        s_prime: &proof::SPrime<C, R>,
+        error_m: &proof::ErrorM<C, R>,
+        ab: &proof::AB<C, R>,
+        query: &proof::Query<C, R>,
+        left: &Proof<C, R>,
+        right: &Proof<C, R>,
+    ) -> Result<proof::NativeF<C, R>>
+    where
+        D: Driver<'dr, F = C::CircuitField>,
+    {
         use InternalCircuitIndex::*;
         use ragu_arithmetic::factor_iter;
 
@@ -62,14 +89,20 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
         // This must exactly match the ordering of the `poly_queries` function
         // in the `compute_v` circuit.
         let mut iters = [
-            factor_iter(left.p.poly.iter_coeffs(), left.challenges.u),
-            factor_iter(right.p.poly.iter_coeffs(), right.challenges.u),
-            factor_iter(left.query.registry_xy_poly.iter_coeffs(), w),
-            factor_iter(right.query.registry_xy_poly.iter_coeffs(), w),
-            factor_iter(s_prime.registry_wx0_poly.iter_coeffs(), left.challenges.y),
-            factor_iter(s_prime.registry_wx1_poly.iter_coeffs(), right.challenges.y),
-            factor_iter(s_prime.registry_wx0_poly.iter_coeffs(), y),
-            factor_iter(s_prime.registry_wx1_poly.iter_coeffs(), y),
+            factor_iter(left.p.native.poly.iter_coeffs(), left.challenges.u),
+            factor_iter(right.p.native.poly.iter_coeffs(), right.challenges.u),
+            factor_iter(left.query.native.registry_xy_poly.iter_coeffs(), w),
+            factor_iter(right.query.native.registry_xy_poly.iter_coeffs(), w),
+            factor_iter(
+                s_prime.native.registry_wx0_poly.iter_coeffs(),
+                left.challenges.y,
+            ),
+            factor_iter(
+                s_prime.native.registry_wx1_poly.iter_coeffs(),
+                right.challenges.y,
+            ),
+            factor_iter(s_prime.native.registry_wx0_poly.iter_coeffs(), y),
+            factor_iter(s_prime.native.registry_wx1_poly.iter_coeffs(), y),
             factor_iter(
                 error_m.native.registry_wy_poly.iter_coeffs(),
                 left.challenges.x,
@@ -79,78 +112,93 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
                 right.challenges.x,
             ),
             factor_iter(error_m.native.registry_wy_poly.iter_coeffs(), x),
-            factor_iter(query.registry_xy_poly.iter_coeffs(), w),
-            factor_iter(query.registry_xy_poly.iter_coeffs(), omega_j(PreambleStage)),
-            factor_iter(query.registry_xy_poly.iter_coeffs(), omega_j(ErrorMStage)),
-            factor_iter(query.registry_xy_poly.iter_coeffs(), omega_j(ErrorNStage)),
-            factor_iter(query.registry_xy_poly.iter_coeffs(), omega_j(QueryStage)),
-            factor_iter(query.registry_xy_poly.iter_coeffs(), omega_j(EvalStage)),
+            factor_iter(query.native.registry_xy_poly.iter_coeffs(), w),
             factor_iter(
-                query.registry_xy_poly.iter_coeffs(),
+                query.native.registry_xy_poly.iter_coeffs(),
+                omega_j(PreambleStage),
+            ),
+            factor_iter(
+                query.native.registry_xy_poly.iter_coeffs(),
+                omega_j(ErrorMStage),
+            ),
+            factor_iter(
+                query.native.registry_xy_poly.iter_coeffs(),
+                omega_j(ErrorNStage),
+            ),
+            factor_iter(
+                query.native.registry_xy_poly.iter_coeffs(),
+                omega_j(QueryStage),
+            ),
+            factor_iter(
+                query.native.registry_xy_poly.iter_coeffs(),
+                omega_j(EvalStage),
+            ),
+            factor_iter(
+                query.native.registry_xy_poly.iter_coeffs(),
                 omega_j(ErrorMFinalStaged),
             ),
             factor_iter(
-                query.registry_xy_poly.iter_coeffs(),
+                query.native.registry_xy_poly.iter_coeffs(),
                 omega_j(ErrorNFinalStaged),
             ),
             factor_iter(
-                query.registry_xy_poly.iter_coeffs(),
+                query.native.registry_xy_poly.iter_coeffs(),
                 omega_j(EvalFinalStaged),
             ),
             factor_iter(
-                query.registry_xy_poly.iter_coeffs(),
+                query.native.registry_xy_poly.iter_coeffs(),
                 omega_j(Hashes1Circuit),
             ),
             factor_iter(
-                query.registry_xy_poly.iter_coeffs(),
+                query.native.registry_xy_poly.iter_coeffs(),
                 omega_j(Hashes2Circuit),
             ),
             factor_iter(
-                query.registry_xy_poly.iter_coeffs(),
+                query.native.registry_xy_poly.iter_coeffs(),
                 omega_j(PartialCollapseCircuit),
             ),
             factor_iter(
-                query.registry_xy_poly.iter_coeffs(),
+                query.native.registry_xy_poly.iter_coeffs(),
                 omega_j(FullCollapseCircuit),
             ),
             factor_iter(
-                query.registry_xy_poly.iter_coeffs(),
+                query.native.registry_xy_poly.iter_coeffs(),
                 omega_j(ComputeVCircuit),
             ),
             factor_iter(
-                query.registry_xy_poly.iter_coeffs(),
+                query.native.registry_xy_poly.iter_coeffs(),
                 left.application.circuit_id.omega_j(),
             ),
             factor_iter(
-                query.registry_xy_poly.iter_coeffs(),
+                query.native.registry_xy_poly.iter_coeffs(),
                 right.application.circuit_id.omega_j(),
             ),
             // A/B polynomial queries:
             // a_poly at xz, b_poly at x for left child, right child, current
-            factor_iter(left.ab.a_poly.iter_coeffs(), xz),
-            factor_iter(left.ab.b_poly.iter_coeffs(), x),
-            factor_iter(right.ab.a_poly.iter_coeffs(), xz),
-            factor_iter(right.ab.b_poly.iter_coeffs(), x),
-            factor_iter(ab.a_poly.iter_coeffs(), xz),
-            factor_iter(ab.b_poly.iter_coeffs(), x),
+            factor_iter(left.ab.native.a_poly.iter_coeffs(), xz),
+            factor_iter(left.ab.native.b_poly.iter_coeffs(), x),
+            factor_iter(right.ab.native.a_poly.iter_coeffs(), xz),
+            factor_iter(right.ab.native.b_poly.iter_coeffs(), x),
+            factor_iter(ab.native.a_poly.iter_coeffs(), xz),
+            factor_iter(ab.native.b_poly.iter_coeffs(), x),
             // Per-rx evaluations at xz only. The same r_i(xz) values feed
             // into both A(xz) (undilated) and B(x) (Z-dilated).
-            factor_iter(left.preamble.native_rx.iter_coeffs(), xz),
+            factor_iter(left.preamble.native.rx.iter_coeffs(), xz),
             factor_iter(left.error_m.native.rx.iter_coeffs(), xz),
             factor_iter(left.error_n.native.rx.iter_coeffs(), xz),
-            factor_iter(left.query.native_rx.iter_coeffs(), xz),
-            factor_iter(left.eval.native_rx.iter_coeffs(), xz),
+            factor_iter(left.query.native.rx.iter_coeffs(), xz),
+            factor_iter(left.eval.native.rx.iter_coeffs(), xz),
             factor_iter(left.application.rx.iter_coeffs(), xz),
             factor_iter(left.circuits.hashes_1_rx.iter_coeffs(), xz),
             factor_iter(left.circuits.hashes_2_rx.iter_coeffs(), xz),
             factor_iter(left.circuits.partial_collapse_rx.iter_coeffs(), xz),
             factor_iter(left.circuits.full_collapse_rx.iter_coeffs(), xz),
             factor_iter(left.circuits.compute_v_rx.iter_coeffs(), xz),
-            factor_iter(right.preamble.native_rx.iter_coeffs(), xz),
+            factor_iter(right.preamble.native.rx.iter_coeffs(), xz),
             factor_iter(right.error_m.native.rx.iter_coeffs(), xz),
             factor_iter(right.error_n.native.rx.iter_coeffs(), xz),
-            factor_iter(right.query.native_rx.iter_coeffs(), xz),
-            factor_iter(right.eval.native_rx.iter_coeffs(), xz),
+            factor_iter(right.query.native.rx.iter_coeffs(), xz),
+            factor_iter(right.eval.native.rx.iter_coeffs(), xz),
             factor_iter(right.application.rx.iter_coeffs(), xz),
             factor_iter(right.circuits.hashes_1_rx.iter_coeffs(), xz),
             factor_iter(right.circuits.hashes_2_rx.iter_coeffs(), xz),
@@ -172,21 +220,29 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
         let blind = C::CircuitField::random(&mut *rng);
         let commitment = poly.commit_to_affine(C::host_generators(self.params), blind);
 
-        let nested_f_witness = nested::Witness {
-            native_f: commitment,
-        };
-        let nested_rx = nested::Stage::<C::HostCurve, R>::rx(&nested_f_witness)?;
-        let nested_blind = C::ScalarField::random(&mut *rng);
-        let nested_commitment =
-            nested_rx.commit_to_affine(C::nested_generators(self.params), nested_blind);
-
-        Ok(proof::F {
+        Ok(proof::NativeF {
             poly,
             blind,
             commitment,
-            nested_rx,
-            nested_blind,
-            nested_commitment,
+        })
+    }
+
+    fn compute_bridge_f<RNG: CryptoRng>(
+        &self,
+        rng: &mut RNG,
+        native: &proof::NativeF<C, R>,
+    ) -> Result<proof::BridgeF<C, R>> {
+        let nested_f_witness = nested::Witness {
+            native_f: native.commitment,
+        };
+        let rx = nested::Stage::<C::HostCurve, R>::rx(&nested_f_witness)?;
+        let blind = C::ScalarField::random(&mut *rng);
+        let commitment = rx.commit_to_affine(C::nested_generators(self.params), blind);
+
+        Ok(proof::BridgeF {
+            rx,
+            blind,
+            commitment,
         })
     }
 }

@@ -39,6 +39,34 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
     where
         D: Driver<'dr, F = C::CircuitField>,
     {
+        let (native_query, query_witness) =
+            self.compute_native_query(rng, w, x, y, z, error_m, left, right)?;
+
+        let bridge = self.compute_bridge_query(rng, &native_query)?;
+
+        Ok((
+            proof::Query {
+                native: native_query,
+                bridge,
+            },
+            query_witness,
+        ))
+    }
+
+    fn compute_native_query<'dr, D, RNG: CryptoRng>(
+        &self,
+        rng: &mut RNG,
+        w: &Element<'dr, D>,
+        x: &Element<'dr, D>,
+        y: &Element<'dr, D>,
+        z: &Element<'dr, D>,
+        error_m: &proof::ErrorM<C, R>,
+        left: &Proof<C, R>,
+        right: &Proof<C, R>,
+    ) -> Result<(proof::NativeQuery<C, R>, native::Witness<C>)>
+    where
+        D: Driver<'dr, F = C::CircuitField>,
+    {
         let w = *w.value().take();
         let x = *x.value().take();
         let y = *y.value().take();
@@ -72,36 +100,44 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
             ),
         };
 
-        let native_rx = native::Stage::<C, R, HEADER_SIZE>::rx(&query_witness)?;
-        let native_blind = C::CircuitField::random(&mut *rng);
+        let rx = native::Stage::<C, R, HEADER_SIZE>::rx(&query_witness)?;
+        let blind = C::CircuitField::random(&mut *rng);
         let host_gen = C::host_generators(self.params);
-        let [registry_xy_commitment, native_commitment] = ragu_arithmetic::batch_to_affine([
+        let [registry_xy_commitment, commitment] = ragu_arithmetic::batch_to_affine([
             registry_xy_poly.commit(host_gen, registry_xy_blind),
-            native_rx.commit(host_gen, native_blind),
+            rx.commit(host_gen, blind),
         ]);
 
-        let nested_query_witness = nested::Witness {
-            native_query: native_commitment,
-            registry_xy: registry_xy_commitment,
-        };
-        let nested_rx = nested::Stage::<C::HostCurve, R>::rx(&nested_query_witness)?;
-        let nested_blind = C::ScalarField::random(&mut *rng);
-        let nested_commitment =
-            nested_rx.commit_to_affine(C::nested_generators(self.params), nested_blind);
-
         Ok((
-            proof::Query {
+            proof::NativeQuery {
                 registry_xy_poly,
                 registry_xy_blind,
                 registry_xy_commitment,
-                native_rx,
-                native_blind,
-                native_commitment,
-                nested_rx,
-                nested_blind,
-                nested_commitment,
+                rx,
+                blind,
+                commitment,
             },
             query_witness,
         ))
+    }
+
+    fn compute_bridge_query<RNG: CryptoRng>(
+        &self,
+        rng: &mut RNG,
+        native: &proof::NativeQuery<C, R>,
+    ) -> Result<proof::BridgeQuery<C, R>> {
+        let nested_query_witness = nested::Witness {
+            native_query: native.commitment,
+            registry_xy: native.registry_xy_commitment,
+        };
+        let rx = nested::Stage::<C::HostCurve, R>::rx(&nested_query_witness)?;
+        let blind = C::ScalarField::random(&mut *rng);
+        let commitment = rx.commit_to_affine(C::nested_generators(self.params), blind);
+
+        Ok(proof::BridgeQuery {
+            rx,
+            blind,
+            commitment,
+        })
     }
 }

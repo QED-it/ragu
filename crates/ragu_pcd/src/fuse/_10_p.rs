@@ -1,11 +1,12 @@
-//! Evaluate $p(X)$.
+//! Accumulate $p(X)$.
 //!
 //! This creates the [`proof::P`] component of the proof, which contains the
 //! accumulated polynomial $p(X)$ and its claimed evaluation $p(u) = v$.
 //!
 //! The commitment and blinding factor are derived as linear combinations of
-//! the child proof commitments/blinds using the additive homomorphism of
-//! Pedersen commitments: `commit(Σ β^j * p_j, Σ β^j * r_j) = Σ β^j * C_j`.
+//! all constituent polynomial commitments/blinds using the additive
+//! homomorphism of Pedersen commitments:
+//! `commit(Σ β^j * p_j, Σ β^j * r_j) = Σ β^j * C_j`.
 //!
 //! The commitment is computed via [`PointsWitness`] Horner evaluation.
 
@@ -63,8 +64,8 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
     where
         D: Driver<'dr, F = C::CircuitField>,
     {
-        let mut poly = f.poly.clone();
-        let mut blind = f.blind;
+        let mut poly = f.native.poly.clone();
+        let mut blind = f.native.blind;
 
         // Collect commitments for PointsWitness construction.
         let mut commitments: Vec<C::HostCurve> = Vec::new();
@@ -95,9 +96,9 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
                     proof.application.commitment,
                 );
                 acc.acc(
-                    &proof.preamble.native_rx,
-                    proof.preamble.native_blind,
-                    proof.preamble.native_commitment,
+                    &proof.preamble.native.rx,
+                    proof.preamble.native.blind,
+                    proof.preamble.native.commitment,
                 );
                 acc.acc(
                     &proof.error_m.native.rx,
@@ -109,24 +110,36 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
                     proof.error_n.native.blind,
                     proof.error_n.native.commitment,
                 );
-                acc.acc(&proof.ab.a_poly, proof.ab.a_blind, proof.ab.a_commitment);
-                acc.acc(&proof.ab.b_poly, proof.ab.b_blind, proof.ab.b_commitment);
                 acc.acc(
-                    &proof.query.native_rx,
-                    proof.query.native_blind,
-                    proof.query.native_commitment,
+                    &proof.ab.native.a_poly,
+                    proof.ab.native.a_blind,
+                    proof.ab.native.a_commitment,
                 );
                 acc.acc(
-                    &proof.query.registry_xy_poly,
-                    proof.query.registry_xy_blind,
-                    proof.query.registry_xy_commitment,
+                    &proof.ab.native.b_poly,
+                    proof.ab.native.b_blind,
+                    proof.ab.native.b_commitment,
                 );
                 acc.acc(
-                    &proof.eval.native_rx,
-                    proof.eval.native_blind,
-                    proof.eval.native_commitment,
+                    &proof.query.native.rx,
+                    proof.query.native.blind,
+                    proof.query.native.commitment,
                 );
-                acc.acc(&proof.p.poly, proof.p.blind, proof.p.commitment);
+                acc.acc(
+                    &proof.query.native.registry_xy_poly,
+                    proof.query.native.registry_xy_blind,
+                    proof.query.native.registry_xy_commitment,
+                );
+                acc.acc(
+                    &proof.eval.native.rx,
+                    proof.eval.native.blind,
+                    proof.eval.native.commitment,
+                );
+                acc.acc(
+                    &proof.p.native.poly,
+                    proof.p.native.blind,
+                    proof.p.native.commitment,
+                );
                 acc.acc(
                     &proof.circuits.hashes_1_rx,
                     proof.circuits.hashes_1_blind,
@@ -155,26 +168,26 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
             }
 
             acc.acc(
-                &s_prime.registry_wx0_poly,
-                s_prime.registry_wx0_blind,
-                s_prime.registry_wx0_commitment,
+                &s_prime.native.registry_wx0_poly,
+                s_prime.native.registry_wx0_blind,
+                s_prime.native.registry_wx0_commitment,
             );
             acc.acc(
-                &s_prime.registry_wx1_poly,
-                s_prime.registry_wx1_blind,
-                s_prime.registry_wx1_commitment,
+                &s_prime.native.registry_wx1_poly,
+                s_prime.native.registry_wx1_blind,
+                s_prime.native.registry_wx1_commitment,
             );
             acc.acc(
                 &error_m.native.registry_wy_poly,
                 error_m.native.registry_wy_blind,
                 error_m.native.registry_wy_commitment,
             );
-            acc.acc(&ab.a_poly, ab.a_blind, ab.a_commitment);
-            acc.acc(&ab.b_poly, ab.b_blind, ab.b_commitment);
+            acc.acc(&ab.native.a_poly, ab.native.a_blind, ab.native.a_commitment);
+            acc.acc(&ab.native.b_poly, ab.native.b_blind, ab.native.b_commitment);
             acc.acc(
-                &query.registry_xy_poly,
-                query.registry_xy_blind,
-                query.registry_xy_commitment,
+                &query.native.registry_xy_poly,
+                query.native.registry_xy_blind,
+                query.native.registry_xy_commitment,
             );
         }
 
@@ -182,7 +195,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
         // Points order: [f.commitment, commitments...] computes β^n·f + β^{n-1}·C₀ + ...
         let (commitment, endoscalar_rx, points_rx, step_rxs) = {
             let mut points = Vec::with_capacity(NUM_ENDOSCALING_POINTS);
-            points.push(f.commitment);
+            points.push(f.native.commitment);
             points.extend_from_slice(&commitments);
 
             let witness =
@@ -227,13 +240,17 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
         let v = poly.eval(*u.value().take());
 
         Ok(proof::P {
-            poly,
-            blind,
-            commitment,
-            v,
-            endoscalar_rx,
-            points_rx,
-            step_rxs,
+            native: proof::NativeP {
+                poly,
+                blind,
+                commitment,
+                v,
+            },
+            nested: proof::NestedP {
+                endoscalar_rx,
+                points_rx,
+                step_rxs,
+            },
         })
     }
 }
