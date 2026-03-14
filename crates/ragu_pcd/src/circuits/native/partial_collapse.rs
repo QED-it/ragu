@@ -77,8 +77,6 @@ use crate::components::{
     fold_revdot,
 };
 
-pub(crate) use super::InternalCircuitIndex::PartialCollapseCircuit as CIRCUIT_ID;
-
 /// Circuit that verifies layer 1 of the two-layer revdot reduction.
 ///
 /// See the [module-level documentation] for details on the operations

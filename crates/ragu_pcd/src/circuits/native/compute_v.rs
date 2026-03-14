@@ -77,8 +77,6 @@ use super::{
 };
 use ragu_circuits::horner::Horner;
 
-pub(crate) use super::InternalCircuitIndex::ComputeVCircuit as CIRCUIT_ID;
-
 /// Circuit that computes and verifies the claimed evaluation value [$v$].
 ///
 /// See the [module-level documentation] for details on the operations

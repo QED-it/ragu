@@ -98,8 +98,6 @@ use super::{
 use crate::RAGU_TAG;
 use crate::components::{fold_revdot, root_of_unity, suffix::WithSuffix, transcript::Transcript};
 
-pub(crate) use super::InternalCircuitIndex::Hashes1Circuit as CIRCUIT_ID;
-
 /// Public output of the first hash circuit.
 ///
 /// This circuit uniquely includes the `left` and `right` output headers from

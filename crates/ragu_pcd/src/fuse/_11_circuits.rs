@@ -68,7 +68,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
             })?;
         let hashes_1_rx = self.native_registry.assemble(
             &hashes_1_trace,
-            native::hashes_1::CIRCUIT_ID.circuit_index(),
+            native::InternalCircuitIndex::Hashes1Circuit.circuit_index(),
         )?;
         let hashes_1_rx_blind = C::CircuitField::random(&mut *rng);
 
@@ -81,7 +81,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
             )?;
         let hashes_2_rx = self.native_registry.assemble(
             &hashes_2_trace,
-            native::hashes_2::CIRCUIT_ID.circuit_index(),
+            native::InternalCircuitIndex::Hashes2Circuit.circuit_index(),
         )?;
         let hashes_2_rx_blind = C::CircuitField::random(&mut *rng);
 
@@ -96,7 +96,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
             )?;
         let partial_collapse_rx = self.native_registry.assemble(
             &partial_collapse_trace,
-            native::partial_collapse::CIRCUIT_ID.circuit_index(),
+            native::InternalCircuitIndex::PartialCollapseCircuit.circuit_index(),
         )?;
         let partial_collapse_rx_blind = C::CircuitField::random(&mut *rng);
 
@@ -110,7 +110,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
             )?;
         let full_collapse_rx = self.native_registry.assemble(
             &full_collapse_trace,
-            native::full_collapse::CIRCUIT_ID.circuit_index(),
+            native::InternalCircuitIndex::FullCollapseCircuit.circuit_index(),
         )?;
         let full_collapse_rx_blind = C::CircuitField::random(&mut *rng);
 
@@ -123,7 +123,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
             })?;
         let compute_v_rx = self.native_registry.assemble(
             &compute_v_trace,
-            native::compute_v::CIRCUIT_ID.circuit_index(),
+            native::InternalCircuitIndex::ComputeVCircuit.circuit_index(),
         )?;
         let compute_v_rx_blind = C::CircuitField::random(&mut *rng);
 

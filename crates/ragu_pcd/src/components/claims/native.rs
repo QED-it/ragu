@@ -169,14 +169,14 @@ where
         .zip(source.rx(ErrorN))
     {
         processor.internal_circuit(
-            circuits::native::hashes_1::CIRCUIT_ID,
+            InternalCircuitIndex::Hashes1Circuit,
             [h1, pre, en].into_iter(),
         );
     }
 
     // hashes_2: needs Hashes2 + ErrorN for each proof
     for (h2, en) in source.rx(Hashes2).zip(source.rx(ErrorN)) {
-        processor.internal_circuit(circuits::native::hashes_2::CIRCUIT_ID, [h2, en].into_iter());
+        processor.internal_circuit(InternalCircuitIndex::Hashes2Circuit, [h2, en].into_iter());
     }
 
     // partial_collapse: needs PartialCollapse + Preamble + ErrorM + ErrorN
@@ -187,7 +187,7 @@ where
         .zip(source.rx(ErrorN))
     {
         processor.internal_circuit(
-            circuits::native::partial_collapse::CIRCUIT_ID,
+            InternalCircuitIndex::PartialCollapseCircuit,
             [pc, pre, em, en].into_iter(),
         );
     }
@@ -199,7 +199,7 @@ where
         .zip(source.rx(ErrorN))
     {
         processor.internal_circuit(
-            circuits::native::full_collapse::CIRCUIT_ID,
+            InternalCircuitIndex::FullCollapseCircuit,
             [fc, pre, en].into_iter(),
         );
     }
@@ -212,7 +212,7 @@ where
         .zip(source.rx(Eval))
     {
         processor.internal_circuit(
-            circuits::native::compute_v::CIRCUIT_ID,
+            InternalCircuitIndex::ComputeVCircuit,
             [cv, pre, q, e].into_iter(),
         );
     }
