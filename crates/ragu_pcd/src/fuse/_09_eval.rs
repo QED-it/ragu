@@ -7,11 +7,7 @@
 use ff::Field;
 use ragu_arithmetic::Cycle;
 use ragu_circuits::{polynomials::Rank, staging::StageExt};
-use ragu_core::{
-    Result,
-    drivers::Driver,
-    maybe::{Always, Maybe},
-};
+use ragu_core::{Result, drivers::Driver, maybe::Maybe};
 use ragu_primitives::Element;
 use rand::CryptoRng;
 
@@ -34,7 +30,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
         query: &proof::Query<C, R>,
     ) -> Result<(proof::Eval<C, R>, native::Witness<C::CircuitField>)>
     where
-        D: Driver<'dr, F = C::CircuitField, MaybeKind = Always<()>>,
+        D: Driver<'dr, F = C::CircuitField>,
     {
         let u = *u.value().take();
 

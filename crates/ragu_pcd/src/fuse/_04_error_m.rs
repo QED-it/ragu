@@ -10,11 +10,7 @@
 use ff::Field;
 use ragu_arithmetic::Cycle;
 use ragu_circuits::{polynomials::Rank, registry::RegistryAt, staging::StageExt};
-use ragu_core::{
-    Result,
-    drivers::Driver,
-    maybe::{Always, Maybe},
-};
+use ragu_core::{Result, drivers::Driver, maybe::Maybe};
 use ragu_primitives::Element;
 use rand::CryptoRng;
 
@@ -45,7 +41,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
         claims::Builder<'_, 'rx, C::CircuitField, R>,
     )>
     where
-        D: Driver<'dr, F = C::CircuitField, MaybeKind = Always<()>>,
+        D: Driver<'dr, F = C::CircuitField>,
     {
         let (native_error_m, error_m_witness, builder) =
             self.compute_native_error_m(rng, native_registry, y, z, left, right)?;
@@ -80,7 +76,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
         claims::Builder<'_, 'rx, C::CircuitField, R>,
     )>
     where
-        D: Driver<'dr, F = C::CircuitField, MaybeKind = Always<()>>,
+        D: Driver<'dr, F = C::CircuitField>,
     {
         let y = *y.value().take();
         let z = *z.value().take();

@@ -15,11 +15,7 @@ use ragu_circuits::{
     polynomials::{Rank, unstructured},
     staging::StageExt,
 };
-use ragu_core::{
-    Result,
-    drivers::Driver,
-    maybe::{Always, Maybe},
-};
+use ragu_core::{Result, drivers::Driver, maybe::Maybe};
 use ragu_primitives::Element;
 use rand::CryptoRng;
 
@@ -48,7 +44,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
         right: &Proof<C, R>,
     ) -> Result<proof::F<C, R>>
     where
-        D: Driver<'dr, F = C::CircuitField, MaybeKind = Always<()>>,
+        D: Driver<'dr, F = C::CircuitField>,
     {
         use InternalCircuitIndex::*;
         use ragu_arithmetic::factor_iter;

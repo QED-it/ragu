@@ -17,11 +17,7 @@ use ragu_circuits::{
     polynomials::{Rank, unstructured},
     staging::{MultiStage, StageExt},
 };
-use ragu_core::{
-    Result,
-    drivers::Driver,
-    maybe::{Always, Maybe},
-};
+use ragu_core::{Result, drivers::Driver, maybe::Maybe};
 use ragu_primitives::{Element, extract_endoscalar, lift_endoscalar, vec::Len};
 
 use crate::circuits::nested::NUM_ENDOSCALING_POINTS;
@@ -65,7 +61,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
         f: &proof::F<C, R>,
     ) -> Result<proof::P<C, R>>
     where
-        D: Driver<'dr, F = C::CircuitField, MaybeKind = Always<()>>,
+        D: Driver<'dr, F = C::CircuitField>,
     {
         let mut poly = f.poly.clone();
         let mut blind = f.blind;

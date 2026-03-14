@@ -15,7 +15,7 @@ use ragu_circuits::{
 use ragu_core::{
     Result,
     drivers::{Driver, emulator::Emulator},
-    maybe::{Always, Maybe},
+    maybe::Maybe,
 };
 use ragu_primitives::{Element, vec::FixedVec};
 use rand::CryptoRng;
@@ -60,7 +60,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
         FixedVec<structured::Polynomial<C::CircuitField, R>, NativeN>,
     )>
     where
-        D: Driver<'dr, F = C::CircuitField, MaybeKind = Always<()>>,
+        D: Driver<'dr, F = C::CircuitField>,
     {
         let y = *y.value().take();
         let mu = *mu.value().take();
