@@ -16,11 +16,11 @@ use rand::CryptoRng;
 
 use crate::{
     Application, Proof,
-    circuits::{native::stages::error_m as native, nested::stages::error_m as nested},
     components::{
         claims,
         fold_revdot::{self, NativeParameters},
     },
+    internal::{native::stages::error_m as native, nested::stages::error_m as nested},
     proof,
 };
 

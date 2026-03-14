@@ -23,7 +23,7 @@ use ragu_core::drivers::Driver;
 use ragu_primitives::Element;
 
 use super::{Builder, Source};
-use crate::circuits::{self, native::InternalCircuitIndex};
+use crate::internal::{self, native::InternalCircuitIndex};
 
 /// Number of circuits using unified k(y) in [`build`].
 ///
@@ -33,13 +33,13 @@ use crate::circuits::{self, native::InternalCircuitIndex};
 /// Note: [`hashes_1`] separately uses `unified_bridge_ky` because its public
 /// inputs include child proof headers (see [`hashes_1::Output`]).
 ///
-/// [`hashes_1`]: crate::circuits::native::hashes_1
-/// [`hashes_1::Output`]: crate::circuits::native::hashes_1::Output
-/// [`hashes_2`]: crate::circuits::native::hashes_2
-/// [`partial_collapse`]: crate::circuits::native::partial_collapse
-/// [`full_collapse`]: crate::circuits::native::full_collapse
-/// [`compute_v`]: crate::circuits::native::compute_v
-/// [`unified::InternalOutputKind`]: crate::circuits::native::unified::InternalOutputKind
+/// [`hashes_1`]: crate::internal::native::hashes_1
+/// [`hashes_1::Output`]: crate::internal::native::hashes_1::Output
+/// [`hashes_2`]: crate::internal::native::hashes_2
+/// [`partial_collapse`]: crate::internal::native::partial_collapse
+/// [`full_collapse`]: crate::internal::native::full_collapse
+/// [`compute_v`]: crate::internal::native::compute_v
+/// [`unified::InternalOutputKind`]: crate::internal::native::unified::InternalOutputKind
 pub const NUM_UNIFIED_CIRCUITS: usize = 4;
 
 /// Enum identifying which native field rx polynomial to retrieve from a proof.
@@ -239,26 +239,26 @@ where
 
     // Native stages (aggregated across all proofs)
     processor.stage(
-        circuits::native::stages::preamble::STAGING_ID,
+        internal::native::stages::preamble::STAGING_ID,
         source.rx(Preamble),
     )?;
 
     processor.stage(
-        circuits::native::stages::error_m::STAGING_ID,
+        internal::native::stages::error_m::STAGING_ID,
         source.rx(ErrorM),
     )?;
 
     processor.stage(
-        circuits::native::stages::error_n::STAGING_ID,
+        internal::native::stages::error_n::STAGING_ID,
         source.rx(ErrorN),
     )?;
 
     processor.stage(
-        circuits::native::stages::query::STAGING_ID,
+        internal::native::stages::query::STAGING_ID,
         source.rx(Query),
     )?;
 
-    processor.stage(circuits::native::stages::eval::STAGING_ID, source.rx(Eval))?;
+    processor.stage(internal::native::stages::eval::STAGING_ID, source.rx(Eval))?;
 
     Ok(())
 }

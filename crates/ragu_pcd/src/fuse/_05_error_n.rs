@@ -22,17 +22,17 @@ use rand::CryptoRng;
 
 use crate::{
     Application,
-    circuits::{
+    components::{
+        claims,
+        fold_revdot::{self, NativeParameters},
+    },
+    internal::{
         native::stages::{
             error_m as native_error_m, error_n as native,
             error_n::{ChildKyValues, KyValues},
             preamble as native_preamble,
         },
         nested::stages::error_n as nested,
-    },
-    components::{
-        claims,
-        fold_revdot::{self, NativeParameters},
     },
     proof,
 };

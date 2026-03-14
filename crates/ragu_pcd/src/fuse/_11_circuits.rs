@@ -6,8 +6,8 @@ use rand::CryptoRng;
 
 use crate::{
     Application,
-    circuits::{self, native, native::total_circuit_counts},
     components::fold_revdot::NativeParameters,
+    internal::{self, native, native::total_circuit_counts},
     proof,
 };
 
@@ -27,8 +27,8 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
         preamble_witness: &native::stages::preamble::Witness<'_, C, R, HEADER_SIZE>,
         error_n_witness: &native::stages::error_n::Witness<C, NativeParameters>,
         error_m_witness: &native::stages::error_m::Witness<C, NativeParameters>,
-        query_witness: &circuits::native::stages::query::Witness<C>,
-        eval_witness: &circuits::native::stages::eval::Witness<C::CircuitField>,
+        query_witness: &internal::native::stages::query::Witness<C>,
+        eval_witness: &internal::native::stages::eval::Witness<C::CircuitField>,
         challenges: &proof::Challenges<C>,
     ) -> Result<proof::InternalCircuits<C, R>> {
         let unified = native::unified::Instance {

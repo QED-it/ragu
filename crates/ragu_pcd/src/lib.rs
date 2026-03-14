@@ -11,10 +11,10 @@ extern crate alloc;
 #[cfg(feature = "multicore")]
 extern crate std;
 
-mod circuits;
 mod components;
 mod fuse;
 pub mod header;
+mod internal;
 mod proof;
 pub mod step;
 mod verify;
@@ -114,10 +114,10 @@ impl<'params, C: Cycle, R: Rank, const HEADER_SIZE: usize>
         // 3. Internal steps
         // 4. Application circuits (already registered)
         let (total_circuits, log2_circuits) =
-            circuits::native::total_circuit_counts(self.num_application_steps);
+            internal::native::total_circuit_counts(self.num_application_steps);
 
         // First, register internal masks and circuits
-        self.native_registry = circuits::native::register_all::<C, R, HEADER_SIZE>(
+        self.native_registry = internal::native::register_all::<C, R, HEADER_SIZE>(
             self.native_registry,
             params,
             log2_circuits,
@@ -147,7 +147,7 @@ impl<'params, C: Cycle, R: Rank, const HEADER_SIZE: usize>
         );
 
         // Register nested internal circuits (no application steps, no headers).
-        self.nested_registry = circuits::nested::register_all::<C, R>(self.nested_registry)?;
+        self.nested_registry = internal::nested::register_all::<C, R>(self.nested_registry)?;
 
         Ok(Application {
             native_registry: self.native_registry.finalize()?,

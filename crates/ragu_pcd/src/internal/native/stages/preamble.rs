@@ -20,9 +20,9 @@ use ragu_primitives::{
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 
-use crate::{Proof, circuits::native::unified, header::Header, step::internal::padded};
+use crate::{Proof, header::Header, internal::native::unified, step::internal::padded};
 
-pub(crate) use crate::circuits::native::InternalCircuitIndex::PreambleStage as STAGING_ID;
+pub(crate) use crate::internal::native::InternalCircuitIndex::PreambleStage as STAGING_ID;
 
 type HeaderVec<'dr, D, const HEADER_SIZE: usize> = FixedVec<Element<'dr, D>, ConstLen<HEADER_SIZE>>;
 
@@ -290,7 +290,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> staging::Stage<C::CircuitField
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::circuits::native::stages::tests::{HEADER_SIZE, R, assert_stage_values};
+    use crate::internal::native::stages::tests::{HEADER_SIZE, R, assert_stage_values};
     use ragu_pasta::Pasta;
 
     #[test]

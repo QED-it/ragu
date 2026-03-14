@@ -16,8 +16,8 @@ use ragu_primitives::{Point, io::Write};
 
 use core::marker::PhantomData;
 
-/// Number of curve point fields in this stage.
-pub const NUM: usize = 13;
+/// Number of curve points in this stage.
+pub const NUM_POINTS: usize = 13;
 
 /// Witness data for a single child proof in the nested preamble stage.
 ///
@@ -124,7 +124,7 @@ impl<C: CurveAffine, R: Rank> ragu_circuits::staging::Stage<C::Base, R> for Stag
     type OutputKind = Kind![C::Base; Output<'_, _, C>];
 
     fn values() -> usize {
-        NUM * 2
+        NUM_POINTS * 2
     }
 
     fn witness<'dr, 'source: 'dr, D: Driver<'dr, F = C::Base>>(

@@ -13,7 +13,7 @@ use rand::CryptoRng;
 
 use crate::{
     Application, Proof,
-    circuits::{native::stages::eval as native, nested::stages::eval as nested},
+    internal::{native::stages::eval as native, nested::stages::eval as nested},
     proof,
 };
 

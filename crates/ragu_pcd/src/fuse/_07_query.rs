@@ -17,7 +17,7 @@ use rand::CryptoRng;
 
 use crate::{
     Application, Proof,
-    circuits::{
+    internal::{
         native::InternalCircuitValues, native::stages::query as native,
         nested::stages::query as nested,
     },

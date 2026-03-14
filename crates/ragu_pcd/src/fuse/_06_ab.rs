@@ -39,8 +39,8 @@ use rand::CryptoRng;
 
 use crate::{
     Application,
-    circuits::nested::stages::ab as nested,
     components::fold_revdot::{self, NativeParameters},
+    internal::nested::stages::ab as nested,
     proof,
 };
 

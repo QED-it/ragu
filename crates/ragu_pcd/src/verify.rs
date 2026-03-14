@@ -13,8 +13,8 @@ use rand::CryptoRng;
 use core::iter::once;
 
 use crate::{
-    Application, Pcd, Proof, circuits::native::stages::preamble::ProofInputs, components::claims,
-    header::Header,
+    Application, Pcd, Proof, components::claims, header::Header,
+    internal::native::stages::preamble::ProofInputs,
 };
 
 impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_SIZE> {

@@ -11,7 +11,7 @@ use rand::CryptoRng;
 
 use crate::{
     Application, Proof,
-    circuits::{native::stages::preamble as native, nested::stages::preamble as nested},
+    internal::{native::stages::preamble as native, nested::stages::preamble as nested},
     proof,
 };
 

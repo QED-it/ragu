@@ -12,7 +12,7 @@ use ragu_circuits::polynomials::{Rank, structured};
 use ragu_core::Result;
 
 use super::{Builder, Source};
-use crate::circuits::nested::InternalCircuitIndex;
+use crate::internal::nested::InternalCircuitIndex;
 
 /// Enum identifying which nested field rx polynomial to retrieve from a proof.
 #[derive(Clone, Copy, Debug)]
@@ -71,8 +71,8 @@ where
     S: Source<RxComponent = RxComponent>,
     P: Processor<S::Rx>,
 {
-    use crate::circuits::nested::NUM_ENDOSCALING_POINTS;
     use crate::components::endoscalar::NumStepsLen;
+    use crate::internal::nested::NUM_ENDOSCALING_POINTS;
     use ragu_primitives::vec::Len;
 
     let num_steps = NumStepsLen::<NUM_ENDOSCALING_POINTS>::len();
@@ -133,8 +133,8 @@ pub trait KySource {
 /// - `num_steps` ones (for EndoscalingStep circuit checks, single-proof verification)
 /// - Infinite zeros (for stage checks)
 pub fn ky_values<S: KySource>(source: &S) -> impl Iterator<Item = S::Ky> {
-    use crate::circuits::nested::NUM_ENDOSCALING_POINTS;
     use crate::components::endoscalar::NumStepsLen;
+    use crate::internal::nested::NUM_ENDOSCALING_POINTS;
     use ragu_primitives::vec::Len;
 
     let num_steps = NumStepsLen::<NUM_ENDOSCALING_POINTS>::len();

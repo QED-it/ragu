@@ -9,7 +9,7 @@ use ragu_circuits::{polynomials::Rank, registry::RegistryAt, staging::StageExt};
 use ragu_core::Result;
 use rand::CryptoRng;
 
-use crate::{Application, Proof, circuits::nested::stages::s_prime as nested, proof};
+use crate::{Application, Proof, internal::nested::stages::s_prime as nested, proof};
 
 impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_SIZE> {
     pub(super) fn compute_s_prime<RNG: CryptoRng>(

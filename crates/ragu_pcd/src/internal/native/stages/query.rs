@@ -32,7 +32,7 @@ use core::marker::PhantomData;
 
 use crate::Proof;
 
-use crate::circuits::native::{InternalCircuitIndex, InternalCircuitValues, NUM_INTERNAL_CIRCUITS};
+use crate::internal::native::{InternalCircuitIndex, InternalCircuitValues, NUM_INTERNAL_CIRCUITS};
 
 pub(crate) use InternalCircuitIndex::QueryStage as STAGING_ID;
 
@@ -347,7 +347,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> staging::Stage<C::CircuitField
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::circuits::native::stages::tests::{HEADER_SIZE, R, assert_stage_values};
+    use crate::internal::native::stages::tests::{HEADER_SIZE, R, assert_stage_values};
     use ragu_pasta::Pasta;
 
     #[test]

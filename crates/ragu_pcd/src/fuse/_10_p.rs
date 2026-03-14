@@ -21,11 +21,11 @@ use ragu_circuits::{
 use ragu_core::{Result, drivers::Driver, maybe::Maybe};
 use ragu_primitives::{Element, extract_endoscalar, lift_endoscalar, vec::Len};
 
-use crate::circuits::nested::NUM_ENDOSCALING_POINTS;
 use crate::components::endoscalar::{
     EndoscalarStage, EndoscalingStep, EndoscalingStepWitness, NumStepsLen, PointsStage,
     PointsWitness,
 };
+use crate::internal::nested::NUM_ENDOSCALING_POINTS;
 use crate::{Application, Proof, proof};
 
 /// Accumulates polynomials with their blinds and commitments.
@@ -220,7 +220,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
                 })?;
                 let step_rx = self.nested_registry.assemble(
                     &step_trace,
-                    crate::circuits::nested::InternalCircuitIndex::EndoscalingStep(step as u32)
+                    crate::internal::nested::InternalCircuitIndex::EndoscalingStep(step as u32)
                         .circuit_index(),
                 )?;
                 step_rxs.push(step_rx);
