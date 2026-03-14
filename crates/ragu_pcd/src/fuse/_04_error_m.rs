@@ -34,7 +34,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
     pub(super) fn compute_errors_m<'dr, 'rx, D, RNG: CryptoRng>(
         &self,
         rng: &mut RNG,
-        registry_at_w: &RegistryAt<'_, C::CircuitField, R>,
+        native_registry: &RegistryAt<'_, C::CircuitField, R>,
         y: &Element<'dr, D>,
         z: &Element<'dr, D>,
         left: &'rx Proof<C, R>,
@@ -50,7 +50,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
         let y = *y.value().take();
         let z = *z.value().take();
 
-        let registry_wy_poly = registry_at_w.y(y);
+        let registry_wy_poly = native_registry.y(y);
         let registry_wy_blind = C::CircuitField::random(&mut *rng);
 
         let source = FuseProofSource { left, right };

@@ -68,16 +68,16 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
         let preamble_commitment = Point::constant(&mut dr, preamble.nested_commitment)?;
         preamble_commitment.write(&mut dr, &mut transcript)?;
         let w = transcript.challenge(&mut dr)?;
-        let registry_at_w = self.native_registry.at(*w.value().take());
+        let native_registry = self.native_registry.at(*w.value().take());
 
-        let s_prime = self.compute_s_prime(rng, &registry_at_w, &left, &right)?;
+        let s_prime = self.compute_s_prime(rng, &native_registry, &left, &right)?;
         let s_prime_commitment = Point::constant(&mut dr, s_prime.nested_s_prime_commitment)?;
         s_prime_commitment.write(&mut dr, &mut transcript)?;
         let y = transcript.challenge(&mut dr)?;
         let z = transcript.challenge(&mut dr)?;
 
         let (error_m, error_m_witness, claims) =
-            self.compute_errors_m(rng, &registry_at_w, &y, &z, &left, &right)?;
+            self.compute_errors_m(rng, &native_registry, &y, &z, &left, &right)?;
         let error_m_commitment = Point::constant(&mut dr, error_m.nested_commitment)?;
         error_m_commitment.write(&mut dr, &mut transcript)?;
 

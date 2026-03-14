@@ -15,16 +15,16 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
     pub(super) fn compute_s_prime<RNG: CryptoRng>(
         &self,
         rng: &mut RNG,
-        registry_at_w: &RegistryAt<'_, C::CircuitField, R>,
+        native_registry: &RegistryAt<'_, C::CircuitField, R>,
         left: &Proof<C, R>,
         right: &Proof<C, R>,
     ) -> Result<proof::SPrime<C, R>> {
         let x0 = left.challenges.x;
         let x1 = right.challenges.x;
 
-        let native_registry_wx0_poly = registry_at_w.x(x0);
+        let native_registry_wx0_poly = native_registry.x(x0);
         let native_registry_wx0_blind = C::CircuitField::random(&mut *rng);
-        let native_registry_wx1_poly = registry_at_w.x(x1);
+        let native_registry_wx1_poly = native_registry.x(x1);
         let native_registry_wx1_blind = C::CircuitField::random(&mut *rng);
         let host_gen = C::host_generators(self.params);
         let [
