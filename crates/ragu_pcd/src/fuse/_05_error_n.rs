@@ -141,31 +141,44 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
             ky,
             sponge_state_elements,
         };
-        let native_rx = native::Stage::<C, R, HEADER_SIZE, NativeParameters>::rx(&error_n_witness)?;
-        let native_blind = C::CircuitField::random(&mut *rng);
-        let native_commitment =
-            native_rx.commit_to_affine(C::host_generators(self.params), native_blind);
+        let native = self.compute_native_error_n(rng, &error_n_witness)?;
+        let nested = self.compute_nested_error_n(rng, native.commitment)?;
 
+        Ok((proof::ErrorN { native, nested }, error_n_witness, a, b))
+    }
+
+    fn compute_native_error_n<RNG: CryptoRng>(
+        &self,
+        rng: &mut RNG,
+        error_n_witness: &native::Witness<C, NativeParameters>,
+    ) -> Result<proof::NativeErrorN<C, R>> {
+        let rx = native::Stage::<C, R, HEADER_SIZE, NativeParameters>::rx(error_n_witness)?;
+        let blind = C::CircuitField::random(&mut *rng);
+        let commitment = rx.commit_to_affine(C::host_generators(self.params), blind);
+
+        Ok(proof::NativeErrorN {
+            rx,
+            blind,
+            commitment,
+        })
+    }
+
+    fn compute_nested_error_n<RNG: CryptoRng>(
+        &self,
+        rng: &mut RNG,
+        native_commitment: C::HostCurve,
+    ) -> Result<proof::NestedErrorN<C, R>> {
         let nested_error_n_witness = nested::Witness {
             native_error_n: native_commitment,
         };
-        let nested_rx = nested::Stage::<C::HostCurve, R>::rx(&nested_error_n_witness)?;
-        let nested_blind = C::ScalarField::random(&mut *rng);
-        let nested_commitment =
-            nested_rx.commit_to_affine(C::nested_generators(self.params), nested_blind);
+        let rx = nested::Stage::<C::HostCurve, R>::rx(&nested_error_n_witness)?;
+        let blind = C::ScalarField::random(&mut *rng);
+        let commitment = rx.commit_to_affine(C::nested_generators(self.params), blind);
 
-        Ok((
-            proof::ErrorN {
-                native_rx,
-                native_blind,
-                native_commitment,
-                nested_rx,
-                nested_blind,
-                nested_commitment,
-            },
-            error_n_witness,
-            a,
-            b,
-        ))
+        Ok(proof::NestedErrorN {
+            rx,
+            blind,
+            commitment,
+        })
     }
 }

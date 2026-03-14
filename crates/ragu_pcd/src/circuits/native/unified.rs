@@ -424,7 +424,7 @@ impl<'dr, D: Driver<'dr>, C: Cycle<CircuitField = D::F>> Output<'dr, D, C> {
         let mu = Element::alloc(dr, proof.as_ref().map(|p| p.challenges.mu))?;
         let nu = Element::alloc(dr, proof.as_ref().map(|p| p.challenges.nu))?;
         let nested_error_n_commitment =
-            Point::alloc(dr, proof.as_ref().map(|p| p.error_n.nested_commitment))?;
+            Point::alloc(dr, proof.as_ref().map(|p| p.error_n.nested.commitment))?;
         let mu_prime = Element::alloc(dr, proof.as_ref().map(|p| p.challenges.mu_prime))?;
         let nu_prime = Element::alloc(dr, proof.as_ref().map(|p| p.challenges.nu_prime))?;
         let c = Element::alloc(dr, proof.as_ref().map(|p| p.ab.c))?;

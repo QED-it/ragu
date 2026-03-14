@@ -40,7 +40,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
             nested_error_m_commitment: error_m.nested.commitment,
             mu: challenges.mu,
             nu: challenges.nu,
-            nested_error_n_commitment: error_n.nested_commitment,
+            nested_error_n_commitment: error_n.nested.commitment,
             mu_prime: challenges.mu_prime,
             nu_prime: challenges.nu_prime,
             c: ab.c,

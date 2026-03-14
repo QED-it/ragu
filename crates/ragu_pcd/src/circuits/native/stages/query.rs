@@ -117,7 +117,7 @@ impl<F: PrimeField> ChildEvaluationsWitness<F> {
         ChildEvaluationsWitness {
             preamble: proof.preamble.native_rx.eval(xz),
             error_m: proof.error_m.native.rx.eval(xz),
-            error_n: proof.error_n.native_rx.eval(xz),
+            error_n: proof.error_n.native.rx.eval(xz),
             query: proof.query.native_rx.eval(xz),
             eval: proof.eval.native_rx.eval(xz),
             application: proof.application.rx.eval(xz),

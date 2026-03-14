@@ -43,7 +43,7 @@ impl<F: PrimeField> ChildEvaluationsWitness<F> {
         ChildEvaluationsWitness {
             application: proof.application.rx.eval(u),
             preamble: proof.preamble.native_rx.eval(u),
-            error_n: proof.error_n.native_rx.eval(u),
+            error_n: proof.error_n.native.rx.eval(u),
             error_m: proof.error_m.native.rx.eval(u),
             a_poly: proof.ab.a_poly.eval(u),
             b_poly: proof.ab.b_poly.eval(u),

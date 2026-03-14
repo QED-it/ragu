@@ -105,7 +105,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
             &nu,
             saved_transcript_state,
         )?;
-        let error_n_commitment = Point::constant(&mut dr, error_n.nested_commitment)?;
+        let error_n_commitment = Point::constant(&mut dr, error_n.nested.commitment)?;
         error_n_commitment.write(&mut dr, &mut transcript)?;
         let mu_prime = transcript.challenge(&mut dr)?;
         let nu_prime = transcript.challenge(&mut dr)?;

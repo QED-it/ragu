@@ -83,7 +83,7 @@ impl<C: Cycle, R: Rank> Proof<C, R> {
             ComputeV => &self.circuits.compute_v_rx,
             Preamble => &self.preamble.native_rx,
             ErrorM => &self.error_m.native.rx,
-            ErrorN => &self.error_n.native_rx,
+            ErrorN => &self.error_n.native.rx,
             Query => &self.query.native_rx,
             Eval => &self.eval.native_rx,
         }
@@ -137,12 +137,16 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> crate::Application<'_, C, R, H
                 nested_s_prime_commitment: nested_commitment,
             },
             error_n: ErrorN {
-                native_rx: zero_structured_host.clone(),
-                native_blind: host_blind,
-                native_commitment: host_commitment,
-                nested_rx: zero_structured_nested.clone(),
-                nested_blind,
-                nested_commitment,
+                native: NativeErrorN {
+                    rx: zero_structured_host.clone(),
+                    blind: host_blind,
+                    commitment: host_commitment,
+                },
+                nested: NestedErrorN {
+                    rx: zero_structured_nested.clone(),
+                    blind: nested_blind,
+                    commitment: nested_commitment,
+                },
             },
             error_m: ErrorM {
                 native: NativeErrorM {
