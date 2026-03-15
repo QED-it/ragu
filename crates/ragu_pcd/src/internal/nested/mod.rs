@@ -43,7 +43,7 @@ pub(crate) enum InternalCircuitIndex {
 
 impl InternalCircuitIndex {
     /// Convert to a [`CircuitIndex`] for registry lookup.
-    pub(crate) const fn circuit_index(self) -> CircuitIndex {
+    pub(crate) fn circuit_index(self) -> CircuitIndex {
         match self {
             Self::EndoscalarStage => CircuitIndex::from_u32(0),
             Self::PointsStage => CircuitIndex::from_u32(1),
