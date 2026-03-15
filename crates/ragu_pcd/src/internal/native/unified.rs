@@ -242,23 +242,23 @@ macro_rules! define_unified_instance {
 // Field order is significant: it determines wire ordering in the circuit.
 define_unified_instance! {
     /// Commitment from the preamble proof component.
-    nested_preamble_commitment: Point,
+    bridge_preamble_commitment: Point,
     /// Fiat-Shamir challenge $w$.
     w: Element,
     /// Commitment from the s_prime proof component.
-    nested_s_prime_commitment: Point,
+    bridge_s_prime_commitment: Point,
     /// Fiat-Shamir challenge $y$.
     y: Element,
     /// Fiat-Shamir challenge $z$.
     z: Element,
     /// Commitment from the error_m proof component.
-    nested_error_m_commitment: Point,
+    bridge_error_m_commitment: Point,
     /// First folding layer challenge $\mu$.
     mu: Element,
     /// First folding layer challenge $\nu$.
     nu: Element,
     /// Commitment from the error_n proof component.
-    nested_error_n_commitment: Point,
+    bridge_error_n_commitment: Point,
     /// Second folding layer challenge $\mu'$.
     mu_prime: Element,
     /// Second folding layer challenge $\nu'$.
@@ -266,19 +266,19 @@ define_unified_instance! {
     /// Final revdot claim value from the ab proof component.
     c: Element,
     /// Commitment from the ab proof component.
-    nested_ab_commitment: Point,
+    bridge_ab_commitment: Point,
     /// Polynomial commitment challenge $x$.
     x: Element,
     /// Commitment from the query proof component.
-    nested_query_commitment: Point,
+    bridge_query_commitment: Point,
     /// Query polynomial challenge $\alpha$.
     alpha: Element,
     /// Commitment from the f proof component.
-    nested_f_commitment: Point,
+    bridge_f_commitment: Point,
     /// Final polynomial challenge $u$.
     u: Element,
     /// Commitment from the eval proof component.
-    nested_eval_commitment: Point,
+    bridge_eval_commitment: Point,
     /// Pre-endoscalar beta challenge. Effective beta is derived in compute_v.
     pre_beta: Element,
     /// Expected evaluation at the challenge point for consistency verification.
@@ -410,55 +410,55 @@ impl<'dr, D: Driver<'dr>, C: Cycle<CircuitField = D::F>> Output<'dr, D, C> {
         dr: &mut D,
         proof: DriverValue<D, &Proof<C, R>>,
     ) -> Result<Self> {
-        let nested_preamble_commitment =
+        let bridge_preamble_commitment =
             Point::alloc(dr, proof.as_ref().map(|p| p.preamble.bridge.commitment))?;
         let w = Element::alloc(dr, proof.as_ref().map(|p| p.challenges.w))?;
-        let nested_s_prime_commitment =
+        let bridge_s_prime_commitment =
             Point::alloc(dr, proof.as_ref().map(|p| p.s_prime.bridge.commitment))?;
         let y = Element::alloc(dr, proof.as_ref().map(|p| p.challenges.y))?;
         let z = Element::alloc(dr, proof.as_ref().map(|p| p.challenges.z))?;
-        let nested_error_m_commitment =
+        let bridge_error_m_commitment =
             Point::alloc(dr, proof.as_ref().map(|p| p.error_m.bridge.commitment))?;
         let mu = Element::alloc(dr, proof.as_ref().map(|p| p.challenges.mu))?;
         let nu = Element::alloc(dr, proof.as_ref().map(|p| p.challenges.nu))?;
-        let nested_error_n_commitment =
+        let bridge_error_n_commitment =
             Point::alloc(dr, proof.as_ref().map(|p| p.error_n.bridge.commitment))?;
         let mu_prime = Element::alloc(dr, proof.as_ref().map(|p| p.challenges.mu_prime))?;
         let nu_prime = Element::alloc(dr, proof.as_ref().map(|p| p.challenges.nu_prime))?;
         let c = Element::alloc(dr, proof.as_ref().map(|p| p.ab.native.c))?;
-        let nested_ab_commitment =
+        let bridge_ab_commitment =
             Point::alloc(dr, proof.as_ref().map(|p| p.ab.bridge.commitment))?;
         let x = Element::alloc(dr, proof.as_ref().map(|p| p.challenges.x))?;
-        let nested_query_commitment =
+        let bridge_query_commitment =
             Point::alloc(dr, proof.as_ref().map(|p| p.query.bridge.commitment))?;
         let alpha = Element::alloc(dr, proof.as_ref().map(|p| p.challenges.alpha))?;
-        let nested_f_commitment = Point::alloc(dr, proof.as_ref().map(|p| p.f.bridge.commitment))?;
+        let bridge_f_commitment = Point::alloc(dr, proof.as_ref().map(|p| p.f.bridge.commitment))?;
         let u = Element::alloc(dr, proof.as_ref().map(|p| p.challenges.u))?;
-        let nested_eval_commitment =
+        let bridge_eval_commitment =
             Point::alloc(dr, proof.as_ref().map(|p| p.eval.bridge.commitment))?;
         let pre_beta = Element::alloc(dr, proof.as_ref().map(|p| p.challenges.pre_beta))?;
         let v = Element::alloc(dr, proof.as_ref().map(|p| p.p.native.v))?;
 
         Ok(Output {
-            nested_preamble_commitment,
+            bridge_preamble_commitment,
             w,
-            nested_s_prime_commitment,
+            bridge_s_prime_commitment,
             y,
             z,
-            nested_error_m_commitment,
+            bridge_error_m_commitment,
             mu,
             nu,
-            nested_error_n_commitment,
+            bridge_error_n_commitment,
             mu_prime,
             nu_prime,
             c,
-            nested_ab_commitment,
+            bridge_ab_commitment,
             x,
-            nested_query_commitment,
+            bridge_query_commitment,
             alpha,
-            nested_f_commitment,
+            bridge_f_commitment,
             u,
-            nested_eval_commitment,
+            bridge_eval_commitment,
             pre_beta,
             v,
         })
@@ -512,25 +512,25 @@ mod tests {
     #[test]
     fn coverage_assert_complete_passes_when_all_set() {
         let cov = Coverage {
-            nested_preamble_commitment: true,
+            bridge_preamble_commitment: true,
             w: true,
-            nested_s_prime_commitment: true,
+            bridge_s_prime_commitment: true,
             y: true,
             z: true,
-            nested_error_m_commitment: true,
+            bridge_error_m_commitment: true,
             mu: true,
             nu: true,
-            nested_error_n_commitment: true,
+            bridge_error_n_commitment: true,
             mu_prime: true,
             nu_prime: true,
             c: true,
-            nested_ab_commitment: true,
+            bridge_ab_commitment: true,
             x: true,
-            nested_query_commitment: true,
+            bridge_query_commitment: true,
             alpha: true,
-            nested_f_commitment: true,
+            bridge_f_commitment: true,
             u: true,
-            nested_eval_commitment: true,
+            bridge_eval_commitment: true,
             pre_beta: true,
             v: true,
         };
@@ -560,12 +560,12 @@ mod tests {
     fn coverage_catches_point_overlap() {
         let mut cov = Coverage::default();
         Coverage::cover(
-            &mut cov.nested_preamble_commitment,
-            "nested_preamble_commitment",
+            &mut cov.bridge_preamble_commitment,
+            "bridge_preamble_commitment",
         );
         Coverage::cover(
-            &mut cov.nested_preamble_commitment,
-            "nested_preamble_commitment",
+            &mut cov.bridge_preamble_commitment,
+            "bridge_preamble_commitment",
         );
     }
 

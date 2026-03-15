@@ -7,11 +7,11 @@
 //! This circuit performs the first portion of the Fiat-Shamir transcript,
 //! invoking $3$ Poseidon permutations:
 //! - Initialize the transcript with domain separation tag.
-//! - Absorb [`nested_preamble_commitment`].
+//! - Absorb [`bridge_preamble_commitment`].
 //! - Squeeze [$w$] challenge.
-//! - Absorb [`nested_s_prime_commitment`].
+//! - Absorb [`bridge_s_prime_commitment`].
 //! - Squeeze [$y$] and [$z$] challenges.
-//! - Absorb [`nested_error_m_commitment`].
+//! - Absorb [`bridge_error_m_commitment`].
 //! - Call [`Transcript::save_state`] to capture the transcript state for resumption
 //!   in [`hashes_2`][super::hashes_2]. This applies a permutation (the third) since we're at the
 //!   absorb-to-squeeze boundary.
@@ -63,9 +63,9 @@
 //! zero aligns the internal circuit's instance with the expected format for
 //! $k(y)$ verification.
 //!
-//! [`nested_preamble_commitment`]: unified::Output::nested_preamble_commitment
-//! [`nested_s_prime_commitment`]: unified::Output::nested_s_prime_commitment
-//! [`nested_error_m_commitment`]: unified::Output::nested_error_m_commitment
+//! [`bridge_preamble_commitment`]: unified::Output::bridge_preamble_commitment
+//! [`bridge_s_prime_commitment`]: unified::Output::bridge_s_prime_commitment
+//! [`bridge_error_m_commitment`]: unified::Output::bridge_error_m_commitment
 //! [$w$]: unified::Output::w
 //! [$y$]: unified::Output::y
 //! [$z$]: unified::Output::z
@@ -234,19 +234,19 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Parameters>
         // Create a transcript for all challenge derivations
         let mut transcript = Transcript::new(dr, C::circuit_poseidon(self.params), RAGU_TAG)?;
 
-        // Derive w by absorbing nested_preamble_commitment and squeezing
+        // Derive w by absorbing bridge_preamble_commitment and squeezing
         let w = {
-            let nested_preamble_commitment =
-                unified_output.nested_preamble_commitment.verify(dr)?;
-            nested_preamble_commitment.write(dr, &mut transcript)?;
+            let bridge_preamble_commitment =
+                unified_output.bridge_preamble_commitment.verify(dr)?;
+            bridge_preamble_commitment.write(dr, &mut transcript)?;
             transcript.challenge(dr)?
         };
         unified_output.w.set(w.clone());
 
-        // Derive (y, z) by absorbing nested_s_prime_commitment and squeezing twice
+        // Derive (y, z) by absorbing bridge_s_prime_commitment and squeezing twice
         let (y, z) = {
-            let nested_s_prime_commitment = unified_output.nested_s_prime_commitment.verify(dr)?;
-            nested_s_prime_commitment.write(dr, &mut transcript)?;
+            let bridge_s_prime_commitment = unified_output.bridge_s_prime_commitment.verify(dr)?;
+            bridge_s_prime_commitment.write(dr, &mut transcript)?;
             let y = transcript.challenge(dr)?;
             let z = transcript.challenge(dr)?;
             (y, z)
@@ -274,10 +274,10 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Parameters>
             right_unified_bridge_ky.enforce_equal(dr, &error_n.right.unified_bridge)?;
         }
 
-        // Absorb nested_error_m_commitment and verify saved transcript state
+        // Absorb bridge_error_m_commitment and verify saved transcript state
         {
-            let nested_error_m_commitment = unified_output.nested_error_m_commitment.verify(dr)?;
-            nested_error_m_commitment.write(dr, &mut transcript)?;
+            let bridge_error_m_commitment = unified_output.bridge_error_m_commitment.verify(dr)?;
+            bridge_error_m_commitment.write(dr, &mut transcript)?;
 
             // save_state() applies a permutation (since there's pending absorbed data)
             // and returns the raw state, ready for squeeze-mode resumption in hashes_2.

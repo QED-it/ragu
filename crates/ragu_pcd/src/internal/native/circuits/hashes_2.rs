@@ -8,18 +8,18 @@
 //! [`hashes_1`][super::hashes_1], invoking $5$ Poseidon permutations:
 //! - Resume transcript from saved state via [`Transcript::resume_from_state`] using
 //!   the state witnessed in [`error_n`]. (This state was computed by `hashes_1`
-//!   after absorbing [`nested_error_m_commitment`] and applying the permutation
+//!   after absorbing [`bridge_error_m_commitment`] and applying the permutation
 //!   to move into squeeze mode.)
 //! - Squeeze [$\mu$] and [$\nu$] challenges.
-//! - Absorb [`nested_error_n_commitment`].
+//! - Absorb [`bridge_error_n_commitment`].
 //! - Squeeze [$\mu'$] and [$\nu'$] challenges.
-//! - Absorb [`nested_ab_commitment`].
+//! - Absorb [`bridge_ab_commitment`].
 //! - Squeeze [$x$] challenge.
-//! - Absorb [`nested_query_commitment`].
+//! - Absorb [`bridge_query_commitment`].
 //! - Squeeze [$\alpha$] challenge.
-//! - Absorb [`nested_f_commitment`].
+//! - Absorb [`bridge_f_commitment`].
 //! - Squeeze [$u$] challenge.
-//! - Absorb [`nested_eval_commitment`].
+//! - Absorb [`bridge_eval_commitment`].
 //! - Squeeze [$\beta$] challenge.
 //!
 //! The squeezed $\mu, \nu, \mu', \nu', x, \alpha, u, \beta$ challenges are set
@@ -40,19 +40,19 @@
 //! [`hashes_1`][super::hashes_1] and ensures the instance serialization aligns
 //! with the $k(y)$ computation for `unified_ky`.
 //!
-//! [`nested_error_m_commitment`]: unified::Output::nested_error_m_commitment
+//! [`bridge_error_m_commitment`]: unified::Output::bridge_error_m_commitment
 //! [$\mu$]: unified::Output::mu
 //! [$\nu$]: unified::Output::nu
-//! [`nested_error_n_commitment`]: unified::Output::nested_error_n_commitment
+//! [`bridge_error_n_commitment`]: unified::Output::bridge_error_n_commitment
 //! [$\mu'$]: unified::Output::mu_prime
 //! [$\nu'$]: unified::Output::nu_prime
-//! [`nested_ab_commitment`]: unified::Output::nested_ab_commitment
+//! [`bridge_ab_commitment`]: unified::Output::bridge_ab_commitment
 //! [$x$]: unified::Output::x
-//! [`nested_query_commitment`]: unified::Output::nested_query_commitment
+//! [`bridge_query_commitment`]: unified::Output::bridge_query_commitment
 //! [$\alpha$]: unified::Output::alpha
-//! [`nested_f_commitment`]: unified::Output::nested_f_commitment
+//! [`bridge_f_commitment`]: unified::Output::bridge_f_commitment
 //! [$u$]: unified::Output::u
-//! [`nested_eval_commitment`]: unified::Output::nested_eval_commitment
+//! [`bridge_eval_commitment`]: unified::Output::bridge_eval_commitment
 //! [$\beta$]: unified::Output::pre_beta
 //! [`error_n`]: super::super::stages::error_n
 //! [`WithSuffix`]: crate::internal::suffix::WithSuffix
@@ -178,10 +178,10 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Parameters>
         // Transition back to absorb mode for the rest of the transcript
         let mut transcript = resumed.into_transcript();
 
-        // Derive (mu_prime, nu_prime) by absorbing nested_error_n_commitment
+        // Derive (mu_prime, nu_prime) by absorbing bridge_error_n_commitment
         let (mu_prime, nu_prime) = {
-            let nested_error_n_commitment = unified_output.nested_error_n_commitment.verify(dr)?;
-            nested_error_n_commitment.write(dr, &mut transcript)?;
+            let bridge_error_n_commitment = unified_output.bridge_error_n_commitment.verify(dr)?;
+            bridge_error_n_commitment.write(dr, &mut transcript)?;
             let mu_prime = transcript.challenge(dr)?;
             let nu_prime = transcript.challenge(dr)?;
             (mu_prime, nu_prime)
@@ -189,34 +189,34 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Parameters>
         unified_output.mu_prime.set(mu_prime);
         unified_output.nu_prime.set(nu_prime);
 
-        // Derive x by absorbing nested_ab_commitment and squeezing
+        // Derive x by absorbing bridge_ab_commitment and squeezing
         let x = {
-            let nested_ab_commitment = unified_output.nested_ab_commitment.verify(dr)?;
-            nested_ab_commitment.write(dr, &mut transcript)?;
+            let bridge_ab_commitment = unified_output.bridge_ab_commitment.verify(dr)?;
+            bridge_ab_commitment.write(dr, &mut transcript)?;
             transcript.challenge(dr)?
         };
         unified_output.x.set(x);
 
-        // Derive alpha by absorbing nested_query_commitment and squeezing
+        // Derive alpha by absorbing bridge_query_commitment and squeezing
         let alpha = {
-            let nested_query_commitment = unified_output.nested_query_commitment.verify(dr)?;
-            nested_query_commitment.write(dr, &mut transcript)?;
+            let bridge_query_commitment = unified_output.bridge_query_commitment.verify(dr)?;
+            bridge_query_commitment.write(dr, &mut transcript)?;
             transcript.challenge(dr)?
         };
         unified_output.alpha.set(alpha.clone());
 
-        // Derive u by absorbing nested_f_commitment and squeezing
+        // Derive u by absorbing bridge_f_commitment and squeezing
         let u = {
-            let nested_f_commitment = unified_output.nested_f_commitment.verify(dr)?;
-            nested_f_commitment.write(dr, &mut transcript)?;
+            let bridge_f_commitment = unified_output.bridge_f_commitment.verify(dr)?;
+            bridge_f_commitment.write(dr, &mut transcript)?;
             transcript.challenge(dr)?
         };
         unified_output.u.set(u);
 
-        // Derive pre_beta by absorbing nested_eval_commitment and squeezing
+        // Derive pre_beta by absorbing bridge_eval_commitment and squeezing
         let pre_beta = {
-            let nested_eval_commitment = unified_output.nested_eval_commitment.verify(dr)?;
-            nested_eval_commitment.write(dr, &mut transcript)?;
+            let bridge_eval_commitment = unified_output.bridge_eval_commitment.verify(dr)?;
+            bridge_eval_commitment.write(dr, &mut transcript)?;
             transcript.challenge(dr)?
         };
         unified_output.pre_beta.set(pre_beta);

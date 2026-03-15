@@ -55,7 +55,7 @@ pub struct Witness<C: Cycle, FP: fold_revdot::Parameters> {
     /// $k(y)$ evaluation values.
     pub ky: KyValues<C::CircuitField>,
 
-    /// Sponge state elements saved after absorbing nested_error_m_commitment.
+    /// Sponge state elements saved after absorbing bridge_error_m_commitment.
     /// Used to bridge the Fiat-Shamir transcript between hashes_1 and hashes_2.
     pub sponge_state_elements:
         FixedVec<C::CircuitField, PoseidonStateLen<C::CircuitField, C::CircuitPoseidon>>,
@@ -97,7 +97,7 @@ pub struct Output<
     /// k(y) values for right child proof.
     #[ragu(gadget)]
     pub right: ChildKyOutputs<'dr, D>,
-    /// Sponge state saved after absorbing nested_error_m_commitment.
+    /// Sponge state saved after absorbing bridge_error_m_commitment.
     /// Used to bridge the Fiat-Shamir transcript between hashes_1 and hashes_2.
     #[ragu(gadget)]
     pub sponge_state: SpongeState<'dr, D, Poseidon>,
