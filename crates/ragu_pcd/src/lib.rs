@@ -208,9 +208,8 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
     /// (folded with itself). This gives it valid proof structure, avoiding
     /// base case detection issues.
     ///
-    /// The proof is lazily created on first use and cached. *Importantly*,
-    /// note that this may return the same proof on subsequent calls, and
-    /// is not random.
+    /// The proof is lazily created on first use and cached; subsequent calls
+    /// return the same (non-random) proof.
     fn seeded_trivial_pcd<'source, RNG: CryptoRng>(&self, rng: &mut RNG) -> Pcd<'source, C, R, ()> {
         self.seeded_trivial
             .get_or_init(|| {
