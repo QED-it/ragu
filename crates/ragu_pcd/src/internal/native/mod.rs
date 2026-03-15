@@ -165,6 +165,120 @@ impl<T> InternalCircuitValues<T> {
     }
 }
 
+/// Enum identifying which rx polynomial component to index within [`RxValues`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RxIndex {
+    Preamble,
+    ErrorM,
+    ErrorN,
+    Query,
+    Eval,
+    Application,
+    Hashes1,
+    Hashes2,
+    PartialCollapse,
+    FullCollapse,
+    ComputeV,
+}
+
+/// The number of rx polynomial components.
+const NUM_RX_COMPONENTS: usize = 11;
+
+impl RxIndex {
+    /// All variants in canonical order.
+    ///
+    /// This order matches the evaluation order in `poly_queries` (compute_v.rs)
+    /// and `_08_f.rs`, and drives the `Write` impl for `RxValues`.
+    pub(crate) const ALL: [Self; NUM_RX_COMPONENTS] = [
+        Self::Preamble,
+        Self::ErrorM,
+        Self::ErrorN,
+        Self::Query,
+        Self::Eval,
+        Self::Application,
+        Self::Hashes1,
+        Self::Hashes2,
+        Self::PartialCollapse,
+        Self::FullCollapse,
+        Self::ComputeV,
+    ];
+}
+
+/// Per-rx-component storage indexed by [`RxIndex`].
+///
+/// Each field corresponds 1:1 to a variant of [`RxIndex`].
+/// Use [`get`](Self::get) to look up by variant, and
+/// [`try_from_fn`](Self::try_from_fn) to construct from a closure.
+#[derive(Clone)]
+pub struct RxValues<T> {
+    pub preamble: T,
+    pub error_m: T,
+    pub error_n: T,
+    pub query: T,
+    pub eval: T,
+    pub application: T,
+    pub hashes_1: T,
+    pub hashes_2: T,
+    pub partial_collapse: T,
+    pub full_collapse: T,
+    pub compute_v: T,
+}
+
+impl<T> RxValues<T> {
+    /// Look up the value for the given rx index.
+    pub fn get(&self, id: RxIndex) -> &T {
+        use RxIndex::*;
+        match id {
+            Preamble => &self.preamble,
+            ErrorM => &self.error_m,
+            ErrorN => &self.error_n,
+            Query => &self.query,
+            Eval => &self.eval,
+            Application => &self.application,
+            Hashes1 => &self.hashes_1,
+            Hashes2 => &self.hashes_2,
+            PartialCollapse => &self.partial_collapse,
+            FullCollapse => &self.full_collapse,
+            ComputeV => &self.compute_v,
+        }
+    }
+
+    /// Fallible construction from a closure called once per variant.
+    ///
+    /// The closure is called in [`ALL`](RxIndex::ALL) order.
+    pub fn try_from_fn<E>(
+        mut f: impl FnMut(RxIndex) -> core::result::Result<T, E>,
+    ) -> core::result::Result<Self, E> {
+        use RxIndex::*;
+        Ok(RxValues {
+            preamble: f(Preamble)?,
+            error_m: f(ErrorM)?,
+            error_n: f(ErrorN)?,
+            query: f(Query)?,
+            eval: f(Eval)?,
+            application: f(Application)?,
+            hashes_1: f(Hashes1)?,
+            hashes_2: f(Hashes2)?,
+            partial_collapse: f(PartialCollapse)?,
+            full_collapse: f(FullCollapse)?,
+            compute_v: f(ComputeV)?,
+        })
+    }
+}
+
+/// Identifies a native-field polynomial within a proof — either one of the
+/// two AB polynomials (which are not rx polynomials) or one of the 11 rx
+/// polynomials addressed by [`RxIndex`].
+#[derive(Clone, Copy, Debug)]
+pub enum RxComponent {
+    /// The `a` polynomial from the AB proof (revdot claim).
+    AbA,
+    /// The `b` polynomial from the AB proof (revdot claim).
+    AbB,
+    /// An rx polynomial component indexed by [`RxIndex`].
+    Rx(RxIndex),
+}
+
 /// Registers internal native circuits into the provided registry.
 ///
 /// All circuits registered here are internal and will be placed

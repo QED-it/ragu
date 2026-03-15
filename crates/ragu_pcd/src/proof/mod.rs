@@ -21,7 +21,7 @@ use alloc::vec;
 
 use crate::header::Header;
 use crate::internal::endoscalar::NumStepsLen;
-use crate::internal::native::claims::RxComponent;
+use crate::internal::native::{RxComponent, RxIndex};
 use crate::internal::nested::NUM_ENDOSCALING_POINTS;
 
 /// Represents proof-carrying data, a recursive proof for the correctness of
@@ -66,26 +66,33 @@ impl<C: Cycle, R: Rank> Proof<C, R> {
         Pcd { proof: self, data }
     }
 
-    /// Returns the native-field rx polynomial for the given [`RxComponent`].
-    pub(crate) fn native_rx(
-        &self,
-        component: RxComponent,
-    ) -> &structured::Polynomial<C::CircuitField, R> {
-        use RxComponent::*;
-        match component {
-            AbA => &self.ab.native.a_poly,
-            AbB => &self.ab.native.b_poly,
+    /// Returns the rx polynomial for the given [`RxIndex`].
+    pub(crate) fn rx_poly(&self, idx: RxIndex) -> &structured::Polynomial<C::CircuitField, R> {
+        use RxIndex::*;
+        match idx {
+            Preamble => &self.preamble.native.rx,
+            ErrorM => &self.error_m.native.rx,
+            ErrorN => &self.error_n.native.rx,
+            Query => &self.query.native.rx,
+            Eval => &self.eval.native.rx,
             Application => &self.application.rx,
             Hashes1 => &self.circuits.hashes_1_rx,
             Hashes2 => &self.circuits.hashes_2_rx,
             PartialCollapse => &self.circuits.partial_collapse_rx,
             FullCollapse => &self.circuits.full_collapse_rx,
             ComputeV => &self.circuits.compute_v_rx,
-            Preamble => &self.preamble.native.rx,
-            ErrorM => &self.error_m.native.rx,
-            ErrorN => &self.error_n.native.rx,
-            Query => &self.query.native.rx,
-            Eval => &self.eval.native.rx,
+        }
+    }
+
+    /// Returns the native-field rx polynomial for the given [`RxComponent`].
+    pub(crate) fn native_rx(
+        &self,
+        component: RxComponent,
+    ) -> &structured::Polynomial<C::CircuitField, R> {
+        match component {
+            RxComponent::AbA => &self.ab.native.a_poly,
+            RxComponent::AbB => &self.ab.native.b_poly,
+            RxComponent::Rx(idx) => self.rx_poly(idx),
         }
     }
 }

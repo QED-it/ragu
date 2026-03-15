@@ -60,7 +60,8 @@ use ragu_primitives::{Element, Endoscalar, GadgetExt};
 use alloc::{vec, vec::Vec};
 use core::marker::PhantomData;
 
-use super::super::claims::{self, Processor, RxComponent};
+use super::super::claims::{self, Processor};
+use super::super::{RxComponent, RxIndex};
 use crate::internal::claims::Source;
 use crate::internal::fold_revdot::{Parameters, fold_two_layer};
 use crate::internal::native::RevdotParameters;
@@ -357,21 +358,10 @@ impl<'a, 'dr, D: Driver<'dr>> Source for EvaluationSource<'a, 'dr, D> {
     type AppCircuitId = &'a Element<'dr, D>;
 
     fn rx(&self, component: RxComponent) -> impl Iterator<Item = Self::Rx> {
-        use RxComponent::*;
         let (left, right) = match component {
-            AbA => (&self.left.a_poly_at_xz, &self.right.a_poly_at_xz),
-            AbB => (&self.left.b_poly_at_x, &self.right.b_poly_at_x),
-            Application => (&self.left.application, &self.right.application),
-            Hashes1 => (&self.left.hashes_1, &self.right.hashes_1),
-            Hashes2 => (&self.left.hashes_2, &self.right.hashes_2),
-            PartialCollapse => (&self.left.partial_collapse, &self.right.partial_collapse),
-            FullCollapse => (&self.left.full_collapse, &self.right.full_collapse),
-            ComputeV => (&self.left.compute_v, &self.right.compute_v),
-            Preamble => (&self.left.preamble, &self.right.preamble),
-            ErrorM => (&self.left.error_m, &self.right.error_m),
-            ErrorN => (&self.left.error_n, &self.right.error_n),
-            Query => (&self.left.query, &self.right.query),
-            Eval => (&self.left.eval, &self.right.eval),
+            RxComponent::AbA => (&self.left.a_poly_at_xz, &self.right.a_poly_at_xz),
+            RxComponent::AbB => (&self.left.b_poly_at_x, &self.right.b_poly_at_x),
+            RxComponent::Rx(idx) => (self.left.rx.get(idx), self.right.rx.get(idx)),
         };
         [left, right].into_iter()
     }
@@ -611,19 +601,9 @@ fn poly_queries<'a, 'dr, D: Driver<'dr>, C: Cycle<CircuitField = D::F>, const HE
     // B(x) (Z-dilated) recomputations.
     .chain([(&eval.left, &query.left), (&eval.right, &query.right)]
         .into_iter()
-        .flat_map(|(eval, query)| [
-            (&eval.preamble,         &query.preamble),
-            (&eval.error_m,          &query.error_m),
-            (&eval.error_n,          &query.error_n),
-            (&eval.query,            &query.query),
-            (&eval.eval,             &query.eval),
-            (&eval.application,      &query.application),
-            (&eval.hashes_1,         &query.hashes_1),
-            (&eval.hashes_2,         &query.hashes_2),
-            (&eval.partial_collapse, &query.partial_collapse),
-            (&eval.full_collapse,    &query.full_collapse),
-            (&eval.compute_v,        &query.compute_v),
-        ].into_iter().map(|(e, q)| (e, q, &d.challenges.xz))))
+        .flat_map(move |(eval, query)|
+            RxIndex::ALL.iter().map(move |&id|
+                (eval.rx.get(id), query.rx.get(id), &d.challenges.xz))))
     // m(\omega^j, x, y) evaluations for each internal index j
     .chain(InternalCircuitIndex::ALL.iter().map(|&id| {
         (&eval.registry_xy, query.fixed_registry.get(id), d.internal.get(id))

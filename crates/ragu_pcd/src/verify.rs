@@ -138,7 +138,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
 mod native {
     use super::*;
     use crate::internal::claims::Source;
-    use crate::internal::native::claims::{KySource, RxComponent};
+    use crate::internal::native::{RxComponent, claims::KySource};
 
     pub use crate::internal::native::claims::ky_values;
 

@@ -19,11 +19,11 @@ use ragu_core::{Result, drivers::Driver, maybe::Maybe};
 use ragu_primitives::Element;
 use rand::CryptoRng;
 
-use alloc::vec::Vec;
+use alloc::{vec, vec::Vec};
 
 use crate::{
     Application, Proof,
-    internal::{native, nested},
+    internal::{native, native::RxIndex, nested},
     proof,
 };
 
@@ -88,7 +88,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
 
         // This must exactly match the ordering of the `poly_queries` function
         // in the `compute_v` circuit.
-        let mut iters = [
+        let mut iters: Vec<_> = vec![
             // Child proof p(u)=v checks
             factor_iter(left.p.native.poly.iter_coeffs(), left.challenges.u),
             factor_iter(right.p.native.poly.iter_coeffs(), right.challenges.u),
@@ -132,40 +132,27 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
             factor_iter(right.ab.native.b_poly.iter_coeffs(), x),
             factor_iter(ab.native.a_poly.iter_coeffs(), xz),
             factor_iter(ab.native.b_poly.iter_coeffs(), x),
-            // Per-rx evaluations at xz only. The same r_i(xz) values feed
-            // into both A(xz) (undilated) and B(x) (Z-dilated).
-            factor_iter(left.preamble.native.rx.iter_coeffs(), xz),
-            factor_iter(left.error_m.native.rx.iter_coeffs(), xz),
-            factor_iter(left.error_n.native.rx.iter_coeffs(), xz),
-            factor_iter(left.query.native.rx.iter_coeffs(), xz),
-            factor_iter(left.eval.native.rx.iter_coeffs(), xz),
-            factor_iter(left.application.rx.iter_coeffs(), xz),
-            factor_iter(left.circuits.hashes_1_rx.iter_coeffs(), xz),
-            factor_iter(left.circuits.hashes_2_rx.iter_coeffs(), xz),
-            factor_iter(left.circuits.partial_collapse_rx.iter_coeffs(), xz),
-            factor_iter(left.circuits.full_collapse_rx.iter_coeffs(), xz),
-            factor_iter(left.circuits.compute_v_rx.iter_coeffs(), xz),
-            factor_iter(right.preamble.native.rx.iter_coeffs(), xz),
-            factor_iter(right.error_m.native.rx.iter_coeffs(), xz),
-            factor_iter(right.error_n.native.rx.iter_coeffs(), xz),
-            factor_iter(right.query.native.rx.iter_coeffs(), xz),
-            factor_iter(right.eval.native.rx.iter_coeffs(), xz),
-            factor_iter(right.application.rx.iter_coeffs(), xz),
-            factor_iter(right.circuits.hashes_1_rx.iter_coeffs(), xz),
-            factor_iter(right.circuits.hashes_2_rx.iter_coeffs(), xz),
-            factor_iter(right.circuits.partial_collapse_rx.iter_coeffs(), xz),
-            factor_iter(right.circuits.full_collapse_rx.iter_coeffs(), xz),
-            factor_iter(right.circuits.compute_v_rx.iter_coeffs(), xz),
         ];
+        // Per-rx evaluations at xz only. The same r_i(xz) values feed
+        // into both A(xz) (undilated) and B(x) (Z-dilated).
+        for proof in [left, right] {
+            for &id in &RxIndex::ALL {
+                iters.push(factor_iter(proof.rx_poly(id).iter_coeffs(), xz));
+            }
+        }
 
-        let mut internal = native::InternalCircuitIndex::ALL
-            .map(|id| factor_iter(query.native.registry_xy_poly.iter_coeffs(), omega_j(id)));
+        // m(\omega^j, x, y) evaluations for each internal index j
+        for &id in &native::InternalCircuitIndex::ALL {
+            iters.push(factor_iter(
+                query.native.registry_xy_poly.iter_coeffs(),
+                omega_j(id),
+            ));
+        }
 
         let mut coeffs = Vec::new();
         while let Some(first) = iters[0].next() {
             let c = iters[1..]
                 .iter_mut()
-                .chain(internal.iter_mut())
                 .fold(first, |acc, iter| alpha * acc + iter.next().unwrap());
             coeffs.push(c);
         }

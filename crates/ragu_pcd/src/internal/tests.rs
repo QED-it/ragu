@@ -175,7 +175,7 @@ fn test_native_registry_digest() {
         .finalize(pasta)
         .unwrap();
 
-    let expected = fp!(0x157a330a1fc77577bb23d9dabf3d75556c26034a307af568db64bcc50d339695);
+    let expected = fp!(0x27e46fa6cc3da244cd0ece800ccba42bc93a107684629501b75b17121b7dceac);
 
     assert_eq!(
         app.native_registry.digest(),
@@ -259,4 +259,22 @@ fn print_registry_digests() {
             .map(|b| format!("{:02x}", b))
             .collect::<String>()
     );
+}
+
+#[test]
+fn test_internal_circuit_index_all_exhaustive() {
+    let mut collected = alloc::vec::Vec::new();
+    let _values = InternalCircuitValues::from_fn(|id| {
+        collected.push(id);
+    });
+    assert_eq!(collected.as_slice(), InternalCircuitIndex::ALL);
+}
+
+#[test]
+fn test_rx_index_all_exhaustive() {
+    let mut collected = alloc::vec::Vec::new();
+    let _values = RxValues::from_fn(|id| {
+        collected.push(id);
+    });
+    assert_eq!(collected.as_slice(), RxIndex::ALL);
 }

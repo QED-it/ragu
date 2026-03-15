@@ -32,42 +32,14 @@ use core::marker::PhantomData;
 
 use crate::Proof;
 
-use crate::internal::native::{InternalCircuitIndex, InternalCircuitValues, NUM_INTERNAL_CIRCUITS};
+use crate::internal::native::{
+    InternalCircuitIndex, InternalCircuitValues, NUM_INTERNAL_CIRCUITS, RxIndex, RxValues,
+};
 
 /// Witness for a child proof's polynomial evaluations.
 pub struct ChildEvaluationsWitness<F> {
-    /// Preamble stage `rx` polynomial evaluation at $xz$.
-    pub preamble: F,
-
-    /// Error M stage `rx` polynomial evaluation at $xz$.
-    pub error_m: F,
-
-    /// Error N stage `rx` polynomial evaluation at $xz$.
-    pub error_n: F,
-
-    /// Query stage `rx` polynomial evaluation at $xz$.
-    pub query: F,
-
-    /// Eval stage `rx` polynomial evaluation at $xz$.
-    pub eval: F,
-
-    /// Application circuit `rx` polynomial evaluation at $xz$.
-    pub application: F,
-
-    /// Hashes 1 circuit `rx` polynomial evaluation at $xz$.
-    pub hashes_1: F,
-
-    /// Hashes 2 circuit `rx` polynomial evaluation at $xz$.
-    pub hashes_2: F,
-
-    /// Partial collapse circuit `rx` polynomial evaluation at $xz$.
-    pub partial_collapse: F,
-
-    /// Full collapse circuit `rx` polynomial evaluation at $xz$.
-    pub full_collapse: F,
-
-    /// Compute V circuit `rx` polynomial evaluation at $xz$.
-    pub compute_v: F,
+    /// Rx polynomial evaluations at $xz$.
+    pub rx: RxValues<F>,
 
     /// $A$ polynomial evaluation at $xz$.
     pub a_poly_at_xz: F,
@@ -96,17 +68,19 @@ impl<F: PrimeField> ChildEvaluationsWitness<F> {
         registry_wy: &structured::Polynomial<F, R>,
     ) -> Self {
         ChildEvaluationsWitness {
-            preamble: proof.preamble.native.rx.eval(xz),
-            error_m: proof.error_m.native.rx.eval(xz),
-            error_n: proof.error_n.native.rx.eval(xz),
-            query: proof.query.native.rx.eval(xz),
-            eval: proof.eval.native.rx.eval(xz),
-            application: proof.application.rx.eval(xz),
-            hashes_1: proof.circuits.hashes_1_rx.eval(xz),
-            hashes_2: proof.circuits.hashes_2_rx.eval(xz),
-            partial_collapse: proof.circuits.partial_collapse_rx.eval(xz),
-            full_collapse: proof.circuits.full_collapse_rx.eval(xz),
-            compute_v: proof.circuits.compute_v_rx.eval(xz),
+            rx: RxValues {
+                preamble: proof.preamble.native.rx.eval(xz),
+                error_m: proof.error_m.native.rx.eval(xz),
+                error_n: proof.error_n.native.rx.eval(xz),
+                query: proof.query.native.rx.eval(xz),
+                eval: proof.eval.native.rx.eval(xz),
+                application: proof.application.rx.eval(xz),
+                hashes_1: proof.circuits.hashes_1_rx.eval(xz),
+                hashes_2: proof.circuits.hashes_2_rx.eval(xz),
+                partial_collapse: proof.circuits.partial_collapse_rx.eval(xz),
+                full_collapse: proof.circuits.full_collapse_rx.eval(xz),
+                compute_v: proof.circuits.compute_v_rx.eval(xz),
+            },
             a_poly_at_xz: proof.ab.native.a_poly.eval(xz),
             b_poly_at_x: proof.ab.native.b_poly.eval(x),
             child_registry_xy_at_current_w: proof.query.native.registry_xy_poly.eval(w),
@@ -131,7 +105,7 @@ pub struct Witness<C: Cycle> {
 
 /// Allocate [`InternalCircuitValues`] of [`Element`]s from pre-computed witness
 /// values.
-pub(crate) fn alloc_fixed_registry<'dr, D: Driver<'dr>>(
+pub fn alloc_fixed_registry<'dr, D: Driver<'dr>>(
     dr: &mut D,
     witness: DriverValue<D, &InternalCircuitValues<D::F>>,
 ) -> Result<InternalCircuitValues<Element<'dr, D>>> {
@@ -178,52 +152,63 @@ unsafe impl<F: ff::Field> ragu_core::gadgets::GadgetKind<F>
     }
 }
 
+impl<'dr, D: Driver<'dr>> Gadget<'dr, D> for RxValues<Element<'dr, D>> {
+    type Kind = RxValues<Element<'static, PhantomData<D::F>>>;
+}
+
+// SAFETY: `Element` is `Send` when `D::Wire: Send`, and `RxValues`
+// is a plain product of `Element`s, so the same implication holds.
+unsafe impl<F: ff::Field> ragu_core::gadgets::GadgetKind<F>
+    for RxValues<Element<'static, PhantomData<F>>>
+{
+    type Rebind<'dr, D: Driver<'dr, F = F>> = RxValues<Element<'dr, D>>;
+
+    fn map_gadget<
+        'src,
+        'dst,
+        WM: ragu_core::convert::WireMap<F, Src: Driver<'src, F = F>, Dst: Driver<'dst, F = F>>,
+    >(
+        this: &RxValues<Element<'src, WM::Src>>,
+        wm: &mut WM,
+    ) -> Result<RxValues<Element<'dst, WM::Dst>>> {
+        RxValues::try_from_fn(|id| this.get(id).map(wm))
+    }
+
+    fn enforce_equal_gadget<
+        'dr,
+        D1: Driver<'dr, F = F>,
+        D2: Driver<'dr, F = F, Wire = <D1 as Driver<'dr>>::Wire>,
+    >(
+        dr: &mut D1,
+        a: &RxValues<Element<'dr, D2>>,
+        b: &RxValues<Element<'dr, D2>>,
+    ) -> Result<()> {
+        for &id in &RxIndex::ALL {
+            a.get(id).enforce_equal(dr, b.get(id))?;
+        }
+        Ok(())
+    }
+}
+
+impl<F: ff::Field> ragu_primitives::io::Write<F> for RxValues<Element<'static, PhantomData<F>>> {
+    fn write_gadget<'dr, D: Driver<'dr, F = F>, B: ragu_primitives::io::Buffer<'dr, D>>(
+        this: &Bound<'dr, D, Self>,
+        dr: &mut D,
+        buf: &mut B,
+    ) -> Result<()> {
+        for &id in &RxIndex::ALL {
+            buf.write(dr, this.get(id))?;
+        }
+        Ok(())
+    }
+}
+
 /// Gadget for a child proof's polynomial evaluations.
 #[derive(Gadget)]
 pub struct ChildEvaluations<'dr, D: Driver<'dr>> {
-    /// Preamble stage `rx` polynomial evaluation at $xz$.
+    /// Rx polynomial evaluations at $xz$.
     #[ragu(gadget)]
-    pub preamble: Element<'dr, D>,
-
-    /// Error M stage `rx` polynomial evaluation at $xz$.
-    #[ragu(gadget)]
-    pub error_m: Element<'dr, D>,
-
-    /// Error N stage `rx` polynomial evaluation at $xz$.
-    #[ragu(gadget)]
-    pub error_n: Element<'dr, D>,
-
-    /// Query stage `rx` polynomial evaluation at $xz$.
-    #[ragu(gadget)]
-    pub query: Element<'dr, D>,
-
-    /// Eval stage `rx` polynomial evaluation at $xz$.
-    #[ragu(gadget)]
-    pub eval: Element<'dr, D>,
-
-    /// Application circuit `rx` polynomial evaluation at $xz$.
-    #[ragu(gadget)]
-    pub application: Element<'dr, D>,
-
-    /// Hashes 1 circuit `rx` polynomial evaluation at $xz$.
-    #[ragu(gadget)]
-    pub hashes_1: Element<'dr, D>,
-
-    /// Hashes 2 circuit `rx` polynomial evaluation at $xz$.
-    #[ragu(gadget)]
-    pub hashes_2: Element<'dr, D>,
-
-    /// Partial collapse circuit `rx` polynomial evaluation at $xz$.
-    #[ragu(gadget)]
-    pub partial_collapse: Element<'dr, D>,
-
-    /// Full collapse circuit `rx` polynomial evaluation at $xz$.
-    #[ragu(gadget)]
-    pub full_collapse: Element<'dr, D>,
-
-    /// Compute V circuit `rx` polynomial evaluation at $xz$.
-    #[ragu(gadget)]
-    pub compute_v: Element<'dr, D>,
+    pub rx: RxValues<Element<'dr, D>>,
 
     /// $A$ polynomial evaluation at $xz$.
     #[ragu(gadget)]
@@ -252,18 +237,11 @@ impl<'dr, D: Driver<'dr>> ChildEvaluations<'dr, D> {
         dr: &mut D,
         witness: DriverValue<D, &ChildEvaluationsWitness<D::F>>,
     ) -> Result<Self> {
+        let rx = RxValues::try_from_fn(|id| {
+            Element::alloc(dr, witness.as_ref().map(|w| *w.rx.get(id)))
+        })?;
         Ok(ChildEvaluations {
-            preamble: Element::alloc(dr, witness.as_ref().map(|w| w.preamble))?,
-            error_m: Element::alloc(dr, witness.as_ref().map(|w| w.error_m))?,
-            error_n: Element::alloc(dr, witness.as_ref().map(|w| w.error_n))?,
-            query: Element::alloc(dr, witness.as_ref().map(|w| w.query))?,
-            eval: Element::alloc(dr, witness.as_ref().map(|w| w.eval))?,
-            application: Element::alloc(dr, witness.as_ref().map(|w| w.application))?,
-            hashes_1: Element::alloc(dr, witness.as_ref().map(|w| w.hashes_1))?,
-            hashes_2: Element::alloc(dr, witness.as_ref().map(|w| w.hashes_2))?,
-            partial_collapse: Element::alloc(dr, witness.as_ref().map(|w| w.partial_collapse))?,
-            full_collapse: Element::alloc(dr, witness.as_ref().map(|w| w.full_collapse))?,
-            compute_v: Element::alloc(dr, witness.as_ref().map(|w| w.compute_v))?,
+            rx,
             a_poly_at_xz: Element::alloc(dr, witness.as_ref().map(|w| w.a_poly_at_xz))?,
             b_poly_at_x: Element::alloc(dr, witness.as_ref().map(|w| w.b_poly_at_x))?,
             child_registry_xy_at_current_w: Element::alloc(
