@@ -15,7 +15,7 @@
 //! This circuit verifies layer 1 of the two-layer reduction:
 //! - Retrieves [$\mu$] and [$\nu$] challenges from the unified instance.
 //! - For each group of claims, folds the [`error_m`] terms with the $k(y)$
-//!   values using [`FoldProducts::fold_products_m`].
+//!   values using [`ClaimFolder::fold_inner`].
 //! - Enforces that each computed result equals the corresponding collapsed
 //!   value witnessed in [`error_n`].
 //!
@@ -50,7 +50,7 @@
 //! [`error_n`]: super::super::stages::error_n
 //! [`preamble`]: super::super::stages::preamble
 //! [`hashes_1`]: super::hashes_1
-//! [`FoldProducts::fold_products_m`]: fold_revdot::FoldProducts::fold_products_m
+//! [`ClaimFolder::fold_inner`]: fold_revdot::ClaimFolder::fold_inner
 //! [`TwoProofKySource`]: crate::internal::native::claims::TwoProofKySource
 
 use ragu_arithmetic::Cycle;
@@ -156,7 +156,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Parameters>
         // Get layer 1 folding challenges from the unified instance.
         let mu = unified_output.mu.read(dr)?;
         let nu = unified_output.nu.read(dr)?;
-        let fold_products = fold_revdot::FoldProducts::new(dr, &mu, &nu)?;
+        let fold_products = fold_revdot::ClaimFolder::new(dr, &mu, &nu)?;
 
         // Assemble k(y) values from multiple sources. The ordering must match
         // claims's iteration order for correct folding correspondence.
@@ -179,7 +179,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Parameters>
             let ky = FixedVec::from_fn(|_| ky.next().unwrap());
 
             fold_products
-                .fold_products_m::<FP>(dr, error_terms, &ky)?
+                .fold_inner::<FP>(dr, error_terms, &ky)?
                 .enforce_equal(dr, &error_n.collapsed[i])?;
         }
 

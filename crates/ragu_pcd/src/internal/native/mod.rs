@@ -16,8 +16,8 @@ use crate::step;
 pub struct RevdotParameters;
 
 impl Parameters for RevdotParameters {
-    type N = ConstLen<19>;
-    type M = ConstLen<7>;
+    type NumGroups = ConstLen<19>;
+    type GroupSize = ConstLen<7>;
 }
 
 pub mod stages;

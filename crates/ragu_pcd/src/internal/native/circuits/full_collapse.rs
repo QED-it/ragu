@@ -12,7 +12,7 @@
 //! - Uses the collapsed values from layer 1 (verified by [`partial_collapse`])
 //!   as the $k(y)$ inputs.
 //! - Computes the final folded revdot claim [$c$] using
-//!   [`FoldProducts::fold_products_n`].
+//!   [`ClaimFolder::fold_outer`].
 //! - Enforces that the computed [$c$] matches the witnessed value from the
 //!   unified instance (with base case exception below).
 //!
@@ -43,7 +43,7 @@
 //! [$c$]: unified::Output::c
 //! [`error_n`]: super::super::stages::error_n
 //! [`preamble`]: super::super::stages::preamble
-//! [`FoldProducts::fold_products_n`]: fold_revdot::FoldProducts::fold_products_n
+//! [`ClaimFolder::fold_outer`]: fold_revdot::ClaimFolder::fold_outer
 //! [`is_base_case`]: super::super::stages::preamble::Output::is_base_case
 
 use ragu_arithmetic::Cycle;
@@ -160,12 +160,9 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Parameters>
         // The collapsed values from layer 1 (verified by partial_collapse) serve
         // as the k(y) inputs for this final fold.
         {
-            let fold_products = fold_revdot::FoldProducts::new(dr, &mu_prime, &nu_prime)?;
-            let computed_c = fold_products.fold_products_n::<FP>(
-                dr,
-                &error_n.error_terms,
-                &error_n.collapsed,
-            )?;
+            let fold_products = fold_revdot::ClaimFolder::new(dr, &mu_prime, &nu_prime)?;
+            let computed_c =
+                fold_products.fold_outer::<FP>(dr, &error_n.error_terms, &error_n.collapsed)?;
 
             // Retrieve the witnessed c from the unified instance and mark it
             // as covered by this circuit.

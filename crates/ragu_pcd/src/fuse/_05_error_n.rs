@@ -32,10 +32,10 @@ use crate::{
 
 use super::claims::{FoldKey, FuseBuilder, TrackedPoly};
 
-type NativeN = <native::RevdotParameters as fold_revdot::Parameters>::N;
+type NativeNumGroups = <native::RevdotParameters as fold_revdot::Parameters>::NumGroups;
 
 impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_SIZE> {
-    pub(super) fn compute_errors_n<'dr, 'rx, D, RNG: CryptoRng>(
+    pub(super) fn outer_error_terms<'dr, 'rx, D, RNG: CryptoRng>(
         &self,
         rng: &mut RNG,
         preamble_witness: &native::stages::preamble::Witness<'_, C, R, HEADER_SIZE>,
@@ -51,8 +51,8 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
     ) -> Result<(
         proof::ErrorN<C, R>,
         native::stages::error_n::Witness<C, native::RevdotParameters>,
-        FixedVec<TrackedPoly<'rx, FoldKey, C::CircuitField, R>, NativeN>,
-        FixedVec<structured::Polynomial<C::CircuitField, R>, NativeN>,
+        FixedVec<TrackedPoly<'rx, FoldKey, C::CircuitField, R>, NativeNumGroups>,
+        FixedVec<structured::Polynomial<C::CircuitField, R>, NativeNumGroups>,
     )>
     where
         D: Driver<'dr, F = C::CircuitField>,
@@ -61,9 +61,9 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
         let mu = *mu.value().take();
         let nu = *nu.value().take();
         let mu_inv = mu.invert().expect("mu must be non-zero");
-        let munu = mu * nu;
-        let a = fold_revdot::fold_polys_m::<_, _, native::RevdotParameters>(&claims.a, mu_inv);
-        let b = fold_revdot::fold_polys_m::<_, _, native::RevdotParameters>(&claims.b, munu);
+        let mu_nu = mu * nu;
+        let a = fold_revdot::fold_inner::<_, _, native::RevdotParameters>(&claims.a, mu_inv);
+        let b = fold_revdot::fold_inner::<_, _, native::RevdotParameters>(&claims.b, mu_nu);
         drop(claims);
 
         let (ky, collapsed) = Emulator::emulate_wireless(
@@ -104,7 +104,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
                 );
                 let mut ky = native::claims::ky_values(&ky_source);
 
-                let fold_products = fold_revdot::FoldProducts::new(dr, &mu, &nu)?;
+                let fold_products = fold_revdot::ClaimFolder::new(dr, &mu, &nu)?;
 
                 let collapsed = FixedVec::try_from_fn(|i| {
                     let errors = FixedVec::try_from_fn(|j| {
@@ -112,8 +112,8 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
                     })?;
                     let ky = FixedVec::from_fn(|_| ky.next().unwrap());
 
-                    let v = fold_products
-                        .fold_products_m::<native::RevdotParameters>(dr, &errors, &ky)?;
+                    let v =
+                        fold_products.fold_inner::<native::RevdotParameters>(dr, &errors, &ky)?;
                     Ok(*v.value().take())
                 })?;
 
@@ -134,7 +134,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
             },
         )?;
 
-        let error_terms = fold_revdot::compute_errors_n::<_, R, native::RevdotParameters>(&a, &b);
+        let error_terms = fold_revdot::outer_error_terms::<_, R, native::RevdotParameters>(&a, &b);
 
         let error_n_witness = native::stages::error_n::Witness::<C, native::RevdotParameters> {
             error_terms,

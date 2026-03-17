@@ -65,15 +65,15 @@ impl<K: Copy, F: Field> CommitmentDecomposition<K, F> {
 /// corresponding commitments so that `a_commitment` can be computed cheaply.
 /// Rather than materializing the commitment at each fold step, we track the
 /// linear combination of source polynomials and resolve to commitments once
-/// at the end. Implements [`Foldable`] so it flows through [`fold_polys_m`]
-/// / [`fold_polys_n`] transparently.
+/// at the end. Implements [`Foldable`] so it flows through [`fold_inner`]
+/// / [`fold_outer`] transparently.
 ///
 /// The polynomial is held as a [`Cow`] to avoid cloning borrowed polynomials
 /// during claim building; the fold itself always produces owned results.
 ///
 /// [`Cow`]: alloc::borrow::Cow
-/// [`fold_polys_m`]: crate::internal::fold_revdot::fold_polys_m
-/// [`fold_polys_n`]: crate::internal::fold_revdot::fold_polys_n
+/// [`fold_inner`]: crate::internal::fold_revdot::fold_inner
+/// [`fold_outer`]: crate::internal::fold_revdot::fold_outer
 #[derive(Clone)]
 pub(super) struct TrackedPoly<'a, K, F: Field, R: Rank> {
     pub(super) poly: Cow<'a, structured::Polynomial<F, R>>,

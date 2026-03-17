@@ -47,14 +47,14 @@ use crate::{
 
 use super::claims::{FoldKey, FuseProofSource, TrackedPoly};
 
-type NativeN = <native::RevdotParameters as fold_revdot::Parameters>::N;
+type NativeNumGroups = <native::RevdotParameters as fold_revdot::Parameters>::NumGroups;
 
 impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_SIZE> {
     pub(super) fn compute_ab<'dr, D, RNG: CryptoRng>(
         &self,
         rng: &mut RNG,
-        a: FixedVec<TrackedPoly<'_, FoldKey, C::CircuitField, R>, NativeN>,
-        b: FixedVec<structured::Polynomial<C::CircuitField, R>, NativeN>,
+        a: FixedVec<TrackedPoly<'_, FoldKey, C::CircuitField, R>, NativeNumGroups>,
+        b: FixedVec<structured::Polynomial<C::CircuitField, R>, NativeNumGroups>,
         source: &FuseProofSource<'_, C, R>,
         mu_prime: &Element<'dr, D>,
         nu_prime: &Element<'dr, D>,
@@ -79,8 +79,8 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
     fn compute_native_ab<'dr, D, RNG: CryptoRng>(
         &self,
         rng: &mut RNG,
-        a: FixedVec<TrackedPoly<'_, FoldKey, C::CircuitField, R>, NativeN>,
-        b: FixedVec<structured::Polynomial<C::CircuitField, R>, NativeN>,
+        a: FixedVec<TrackedPoly<'_, FoldKey, C::CircuitField, R>, NativeNumGroups>,
+        b: FixedVec<structured::Polynomial<C::CircuitField, R>, NativeNumGroups>,
         source: &FuseProofSource<'_, C, R>,
         mu_prime: &Element<'dr, D>,
         nu_prime: &Element<'dr, D>,
@@ -96,12 +96,12 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
         let TrackedPoly {
             poly: a_poly,
             decomp: a_decomp,
-        } = fold_revdot::fold_polys_n::<_, _, native::RevdotParameters>(a, mu_prime_inv);
+        } = fold_revdot::fold_outer::<_, _, native::RevdotParameters>(a, mu_prime_inv);
         let a_poly = a_poly.into_owned();
         let a_blind = C::CircuitField::random(&mut *rng);
 
         let b_poly =
-            fold_revdot::fold_polys_n::<_, _, native::RevdotParameters>(b, mu_prime_nu_prime);
+            fold_revdot::fold_outer::<_, _, native::RevdotParameters>(b, mu_prime_nu_prime);
         let b_blind = C::CircuitField::random(&mut *rng);
         let host_gen = C::host_generators(self.params);
 

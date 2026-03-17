@@ -18,7 +18,7 @@ use ragu_primitives::{
 
 use core::marker::PhantomData;
 
-use crate::internal::fold_revdot::{self, ErrorTermsLen};
+use crate::internal::fold_revdot::{self, NumErrorTerms};
 
 /// Witness data for the error_m stage (layer 1).
 ///
@@ -26,7 +26,8 @@ use crate::internal::fold_revdot::{self, ErrorTermsLen};
 pub struct Witness<C: Cycle, FP: fold_revdot::Parameters> {
     /// Error term elements for layer 1.
     /// Outer: N claims, Inner: M²-M error terms per claim.
-    pub error_terms: FixedVec<FixedVec<C::CircuitField, ErrorTermsLen<FP::M>>, FP::N>,
+    pub error_terms:
+        FixedVec<FixedVec<C::CircuitField, NumErrorTerms<FP::GroupSize>>, FP::NumGroups>,
 }
 
 /// Prover-internal output gadget for the error_m stage.
@@ -37,7 +38,8 @@ pub struct Output<'dr, D: Driver<'dr>, FP: fold_revdot::Parameters> {
     /// Error term elements for layer 1.
     /// Outer: N claims, Inner: M²-M error terms per claim.
     #[ragu(gadget)]
-    pub error_terms: FixedVec<FixedVec<Element<'dr, D>, ErrorTermsLen<FP::M>>, FP::N>,
+    pub error_terms:
+        FixedVec<FixedVec<Element<'dr, D>, NumErrorTerms<FP::GroupSize>>, FP::NumGroups>,
 }
 
 /// The error_m stage (layer 1) of the fuse witness.
@@ -55,8 +57,8 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Parameters>
 
     fn values() -> usize {
         // N * (M² - M) error terms
-        let error_terms_per_claim = ErrorTermsLen::<FP::M>::len();
-        FP::N::len() * error_terms_per_claim
+        let error_terms_per_claim = NumErrorTerms::<FP::GroupSize>::len();
+        FP::NumGroups::len() * error_terms_per_claim
     }
 
     fn witness<'dr, 'source: 'dr, D: Driver<'dr, F = C::CircuitField>>(

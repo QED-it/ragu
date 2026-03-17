@@ -23,7 +23,7 @@ use crate::{
 use super::claims::{FuseBuilder, FuseProofSource};
 
 impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_SIZE> {
-    pub(super) fn compute_errors_m<'dr, 'rx, D, RNG: CryptoRng>(
+    pub(super) fn inner_error_terms<'dr, 'rx, D, RNG: CryptoRng>(
         &self,
         rng: &mut RNG,
         native_registry: &RegistryAt<'_, C::CircuitField, R>,
@@ -84,7 +84,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
         native::claims::build(source, &mut builder)?;
 
         let error_m_witness = native::stages::error_m::Witness::<C, native::RevdotParameters> {
-            error_terms: fold_revdot::compute_errors_m::<_, R, native::RevdotParameters>(
+            error_terms: fold_revdot::inner_error_terms::<_, R, native::RevdotParameters>(
                 &builder.a, &builder.b,
             ),
         };

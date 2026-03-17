@@ -78,7 +78,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
         };
 
         let (error_m, error_m_witness, claims) =
-            self.compute_errors_m(rng, &native_registry, &y, &z, &source)?;
+            self.inner_error_terms(rng, &native_registry, &y, &z, &source)?;
         let error_m_commitment = Point::constant(&mut dr, error_m.bridge.commitment)?;
         error_m_commitment.write(&mut dr, &mut transcript)?;
 
@@ -96,7 +96,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
         let mu = transcript.challenge(&mut dr)?;
         let nu = transcript.challenge(&mut dr)?;
 
-        let (error_n, error_n_witness, a, b) = self.compute_errors_n(
+        let (error_n, error_n_witness, a, b) = self.outer_error_terms(
             rng,
             &preamble_witness,
             &error_m_witness,
