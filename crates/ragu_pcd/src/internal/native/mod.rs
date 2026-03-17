@@ -65,21 +65,27 @@ impl InternalCircuitIndex {
     /// in [`RegistryBuilder::finalize()`](ragu_circuits::registry::RegistryBuilder::finalize)
     /// (circuits before masks), since [`circuit_index()`](Self::circuit_index)
     /// derives indices from position in this array.
-    pub const ALL: [Self; NUM_INTERNAL_CIRCUITS] = [
-        Self::Hashes1Circuit,
-        Self::Hashes2Circuit,
-        Self::PartialCollapseCircuit,
-        Self::FullCollapseCircuit,
-        Self::ComputeVCircuit,
-        Self::PreambleStage,
-        Self::ErrorMStage,
-        Self::ErrorNStage,
-        Self::QueryStage,
-        Self::EvalStage,
-        Self::ErrorMFinalStaged,
-        Self::ErrorNFinalStaged,
-        Self::EvalFinalStaged,
-    ];
+    pub const ALL: [Self; NUM_INTERNAL_CIRCUITS] = super::unwrap_all(Self::all_slots());
+
+    const fn all_slots() -> [Option<Self>; NUM_INTERNAL_CIRCUITS] {
+        let mut slots = [None; NUM_INTERNAL_CIRCUITS];
+        let mut c = 0;
+        super::push(&mut slots, &mut c, Self::Hashes1Circuit);
+        super::push(&mut slots, &mut c, Self::Hashes2Circuit);
+        super::push(&mut slots, &mut c, Self::PartialCollapseCircuit);
+        super::push(&mut slots, &mut c, Self::FullCollapseCircuit);
+        super::push(&mut slots, &mut c, Self::ComputeVCircuit);
+        super::push(&mut slots, &mut c, Self::PreambleStage);
+        super::push(&mut slots, &mut c, Self::ErrorMStage);
+        super::push(&mut slots, &mut c, Self::ErrorNStage);
+        super::push(&mut slots, &mut c, Self::QueryStage);
+        super::push(&mut slots, &mut c, Self::EvalStage);
+        super::push(&mut slots, &mut c, Self::ErrorMFinalStaged);
+        super::push(&mut slots, &mut c, Self::ErrorNFinalStaged);
+        super::push(&mut slots, &mut c, Self::EvalFinalStaged);
+        assert!(c == NUM_INTERNAL_CIRCUITS);
+        slots
+    }
 
     pub fn circuit_index(self) -> CircuitIndex {
         let pos = Self::ALL
@@ -194,19 +200,25 @@ impl RxIndex {
     ///
     /// This order matches the evaluation order in `poly_queries` (compute_v.rs)
     /// and `_08_f.rs`, and drives the `Write` impl for `RxValues`.
-    pub const ALL: [Self; NUM_RX_COMPONENTS] = [
-        Self::Application,
-        Self::Hashes1,
-        Self::Hashes2,
-        Self::PartialCollapse,
-        Self::FullCollapse,
-        Self::ComputeV,
-        Self::Preamble,
-        Self::ErrorM,
-        Self::ErrorN,
-        Self::Query,
-        Self::Eval,
-    ];
+    pub const ALL: [Self; NUM_RX_COMPONENTS] = super::unwrap_all(Self::all_slots());
+
+    const fn all_slots() -> [Option<Self>; NUM_RX_COMPONENTS] {
+        let mut slots = [None; NUM_RX_COMPONENTS];
+        let mut c = 0;
+        super::push(&mut slots, &mut c, Self::Application);
+        super::push(&mut slots, &mut c, Self::Hashes1);
+        super::push(&mut slots, &mut c, Self::Hashes2);
+        super::push(&mut slots, &mut c, Self::PartialCollapse);
+        super::push(&mut slots, &mut c, Self::FullCollapse);
+        super::push(&mut slots, &mut c, Self::ComputeV);
+        super::push(&mut slots, &mut c, Self::Preamble);
+        super::push(&mut slots, &mut c, Self::ErrorM);
+        super::push(&mut slots, &mut c, Self::ErrorN);
+        super::push(&mut slots, &mut c, Self::Query);
+        super::push(&mut slots, &mut c, Self::Eval);
+        assert!(c == NUM_RX_COMPONENTS);
+        slots
+    }
 }
 
 /// Per-rx-component storage indexed by [`RxIndex`].
