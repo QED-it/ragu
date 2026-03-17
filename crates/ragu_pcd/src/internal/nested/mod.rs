@@ -42,11 +42,27 @@ pub enum InternalCircuitIndex {
     PointsStage,
     /// `PointsStage` final staged mask.
     PointsFinalStaged,
+    /// Bridge `preamble` stage mask.
+    BridgePreamble,
+    /// Bridge `s_prime` stage mask.
+    BridgeSPrime,
+    /// Bridge `error_m` stage mask.
+    BridgeErrorM,
+    /// Bridge `error_n` stage mask.
+    BridgeErrorN,
+    /// Bridge `ab` stage mask.
+    BridgeAB,
+    /// Bridge `query` stage mask.
+    BridgeQuery,
+    /// Bridge `f` stage mask.
+    BridgeF,
+    /// Bridge `eval` stage mask.
+    BridgeEval,
 }
 
 /// The number of internal circuits registered by [`register_all`],
 /// equal to the number of entries in [`InternalCircuitIndex::ALL`].
-pub const NUM_INTERNAL_CIRCUITS: usize = NUM_ENDOSCALING_STEPS + 3;
+pub const NUM_INTERNAL_CIRCUITS: usize = NUM_ENDOSCALING_STEPS + 11;
 
 impl InternalCircuitIndex {
     /// All variants in canonical iteration order.
@@ -67,6 +83,14 @@ impl InternalCircuitIndex {
         slots[NUM_ENDOSCALING_STEPS] = Some(Self::EndoscalarStage);
         slots[NUM_ENDOSCALING_STEPS + 1] = Some(Self::PointsStage);
         slots[NUM_ENDOSCALING_STEPS + 2] = Some(Self::PointsFinalStaged);
+        slots[NUM_ENDOSCALING_STEPS + 3] = Some(Self::BridgePreamble);
+        slots[NUM_ENDOSCALING_STEPS + 4] = Some(Self::BridgeSPrime);
+        slots[NUM_ENDOSCALING_STEPS + 5] = Some(Self::BridgeErrorM);
+        slots[NUM_ENDOSCALING_STEPS + 6] = Some(Self::BridgeErrorN);
+        slots[NUM_ENDOSCALING_STEPS + 7] = Some(Self::BridgeAB);
+        slots[NUM_ENDOSCALING_STEPS + 8] = Some(Self::BridgeQuery);
+        slots[NUM_ENDOSCALING_STEPS + 9] = Some(Self::BridgeF);
+        slots[NUM_ENDOSCALING_STEPS + 10] = Some(Self::BridgeEval);
         slots
     }
 
@@ -96,11 +120,27 @@ pub enum RxIndex {
     EndoscalarStage,
     /// PointsStage rx polynomial.
     PointsStage,
+    /// Bridge `preamble` rx polynomial.
+    BridgePreamble,
+    /// Bridge `s_prime` rx polynomial.
+    BridgeSPrime,
+    /// Bridge `error_m` rx polynomial.
+    BridgeErrorM,
+    /// Bridge `error_n` rx polynomial.
+    BridgeErrorN,
+    /// Bridge `ab` rx polynomial.
+    BridgeAB,
+    /// Bridge `query` rx polynomial.
+    BridgeQuery,
+    /// Bridge `f` rx polynomial.
+    BridgeF,
+    /// Bridge `eval` rx polynomial.
+    BridgeEval,
 }
 
 /// The number of rx components in the nested field,
 /// equal to the number of entries in [`RxIndex::ALL`].
-pub const NUM_RX_COMPONENTS: usize = NUM_ENDOSCALING_STEPS + 2;
+pub const NUM_RX_COMPONENTS: usize = NUM_ENDOSCALING_STEPS + 10;
 
 impl RxIndex {
     /// All variants in canonical order (circuits, then stages).
@@ -118,6 +158,14 @@ impl RxIndex {
         }
         slots[NUM_ENDOSCALING_STEPS] = Some(Self::EndoscalarStage);
         slots[NUM_ENDOSCALING_STEPS + 1] = Some(Self::PointsStage);
+        slots[NUM_ENDOSCALING_STEPS + 2] = Some(Self::BridgePreamble);
+        slots[NUM_ENDOSCALING_STEPS + 3] = Some(Self::BridgeSPrime);
+        slots[NUM_ENDOSCALING_STEPS + 4] = Some(Self::BridgeErrorM);
+        slots[NUM_ENDOSCALING_STEPS + 5] = Some(Self::BridgeErrorN);
+        slots[NUM_ENDOSCALING_STEPS + 6] = Some(Self::BridgeAB);
+        slots[NUM_ENDOSCALING_STEPS + 7] = Some(Self::BridgeQuery);
+        slots[NUM_ENDOSCALING_STEPS + 8] = Some(Self::BridgeF);
+        slots[NUM_ENDOSCALING_STEPS + 9] = Some(Self::BridgeEval);
         slots
     }
 }
@@ -156,6 +204,30 @@ pub fn register_all<'params, C: Cycle, R: Rank>(
             }
             PointsFinalStaged => {
                 registry.register_internal_final_mask::<endoscalar::PointsStage<C::HostCurve, NUM_ENDOSCALING_POINTS>>()?
+            }
+            BridgePreamble => {
+                registry.register_internal_mask::<stages::preamble::Stage<C::HostCurve, R>>()?
+            }
+            BridgeSPrime => {
+                registry.register_internal_mask::<stages::s_prime::Stage<C::HostCurve, R>>()?
+            }
+            BridgeErrorM => {
+                registry.register_internal_mask::<stages::error_m::Stage<C::HostCurve, R>>()?
+            }
+            BridgeErrorN => {
+                registry.register_internal_mask::<stages::error_n::Stage<C::HostCurve, R>>()?
+            }
+            BridgeAB => {
+                registry.register_internal_mask::<stages::ab::Stage<C::HostCurve, R>>()?
+            }
+            BridgeQuery => {
+                registry.register_internal_mask::<stages::query::Stage<C::HostCurve, R>>()?
+            }
+            BridgeF => {
+                registry.register_internal_mask::<stages::f::Stage<C::HostCurve, R>>()?
+            }
+            BridgeEval => {
+                registry.register_internal_mask::<stages::eval::Stage<C::HostCurve, R>>()?
             }
         };
     }

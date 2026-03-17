@@ -104,6 +104,14 @@ impl<C: Cycle, R: Rank> core::ops::Index<nested::RxIndex> for Proof<C, R> {
             EndoscalingStep(step) => &self.p.nested.step_rxs[step as usize],
             EndoscalarStage => &self.p.nested.endoscalar_rx,
             PointsStage => &self.p.nested.points_rx,
+            BridgePreamble => &self.preamble.bridge.rx,
+            BridgeSPrime => &self.s_prime.bridge.rx,
+            BridgeErrorM => &self.error_m.bridge.rx,
+            BridgeErrorN => &self.error_n.bridge.rx,
+            BridgeAB => &self.ab.bridge.rx,
+            BridgeQuery => &self.query.bridge.rx,
+            BridgeF => &self.f.bridge.rx,
+            BridgeEval => &self.eval.bridge.rx,
         }
     }
 }

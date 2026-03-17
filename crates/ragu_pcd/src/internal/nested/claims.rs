@@ -7,7 +7,7 @@
 //! - Circuit checks ([`EndoscalingStep`](InternalCircuitIndex::EndoscalingStep)): $k(y) = 1$
 //! - Stage checks ([`EndoscalarStage`](InternalCircuitIndex::EndoscalarStage),
 //!   [`PointsStage`](InternalCircuitIndex::PointsStage),
-//!   `PointsFinalStaged`): $k(y) = 0$
+//!   `PointsFinalStaged`, and all `Bridge*` variants): $k(y) = 0$
 
 use alloc::borrow::Cow;
 
@@ -60,7 +60,8 @@ impl<'m, 'rx, F: PrimeField, R: Rank> Processor<&'rx structured::Polynomial<F, R
 /// 1. Circuit checks ($k(y) = 1$): [`EndoscalingStep`](InternalCircuitIndex::EndoscalingStep)
 ///    for each step, interleaved across proofs
 /// 2. Stage checks ($k(y) = 0$): [`EndoscalarStage`](InternalCircuitIndex::EndoscalarStage),
-///    [`PointsStage`](InternalCircuitIndex::PointsStage), `PointsFinalStaged`
+///    [`PointsStage`](InternalCircuitIndex::PointsStage), `PointsFinalStaged`,
+///    and all `Bridge*` variants
 ///
 /// This ordering must match the ky_elements ordering from [`ky_values`].
 pub fn build<S, P>(source: &S, processor: &mut P) -> Result<()>
@@ -91,6 +92,30 @@ where
                 let final_rxs = (0..num_steps)
                     .flat_map(|step| source.rx(RxIndex::EndoscalingStep(step as u32)));
                 processor.stage(id, final_rxs)?;
+            }
+            BridgePreamble => {
+                processor.stage(id, source.rx(RxIndex::BridgePreamble))?;
+            }
+            BridgeSPrime => {
+                processor.stage(id, source.rx(RxIndex::BridgeSPrime))?;
+            }
+            BridgeErrorM => {
+                processor.stage(id, source.rx(RxIndex::BridgeErrorM))?;
+            }
+            BridgeErrorN => {
+                processor.stage(id, source.rx(RxIndex::BridgeErrorN))?;
+            }
+            BridgeAB => {
+                processor.stage(id, source.rx(RxIndex::BridgeAB))?;
+            }
+            BridgeQuery => {
+                processor.stage(id, source.rx(RxIndex::BridgeQuery))?;
+            }
+            BridgeF => {
+                processor.stage(id, source.rx(RxIndex::BridgeF))?;
+            }
+            BridgeEval => {
+                processor.stage(id, source.rx(RxIndex::BridgeEval))?;
             }
         }
     }
