@@ -153,7 +153,7 @@ impl<'params, F: FromUniformBytes<64>, R: Rank> RegistryBuilder<'params, F, R> {
     where
         S: Stage<F, R>,
     {
-        self.internal_masks.push(S::mask()?);
+        self.internal_masks.push(S::mask()?.into_inner());
         Ok(self)
     }
 
@@ -162,7 +162,7 @@ impl<'params, F: FromUniformBytes<64>, R: Rank> RegistryBuilder<'params, F, R> {
     where
         S: Stage<F, R>,
     {
-        self.internal_masks.push(S::final_mask()?);
+        self.internal_masks.push(S::final_mask()?.into_inner());
         Ok(self)
     }
 
@@ -283,10 +283,9 @@ impl<'params, F: FromUniformBytes<64>, R: Rank> RegistryBuilder<'params, F, R> {
 /// directly.
 ///
 /// The key is computed during [`RegistryBuilder::finalize`] and used during
-/// polynomial evaluations of [`CircuitObject`].
+/// polynomial evaluations of circuits in the registry.
 ///
 /// [#78]: https://github.com/tachyon-zcash/ragu/issues/78
-/// [`CircuitObject`]: crate::CircuitObject
 pub struct Key<F: Field> {
     /// Registry digest value
     val: F,

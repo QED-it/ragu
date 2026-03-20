@@ -203,7 +203,7 @@ impl<F: Field, C: Circuit<F>> CircuitExt<F> for C {}
 /// A trait for (partially) evaluating $s(X, Y)$ for some circuit.
 ///
 /// Constructed internally from a [`Circuit`] implementation.
-pub trait CircuitObject<F: Field, R: Rank>: Send + Sync {
+pub(crate) trait CircuitObject<F: Field, R: Rank>: Send + Sync {
     /// Evaluates the polynomial $s(x, y)$ for some $x, y \in \mathbb{F}$.
     fn sxy(
         &self,
@@ -234,8 +234,7 @@ pub trait CircuitObject<F: Field, R: Rank>: Send + Sync {
 
     /// Returns per-segment constraint records in DFS order.
     ///
-    /// These records serve as input to
-    /// [`floor_planner::floor_plan`] for computing absolute offsets.
+    /// See [`BondingPolynomial::segment_records`] for details.
     fn segment_records(&self) -> &[SegmentRecord];
 }
 
@@ -308,4 +307,70 @@ where
 
     let circuit = ProcessedCircuit { circuit, metrics };
     Ok(Box::new(circuit))
+}
+
+/// An evaluable wiring polynomial $s(X, Y)$ used to enforce well-formedness
+/// of a staged trace.
+///
+/// Constructed via [`StageExt::mask`] and [`StageExt::final_mask`]; the
+/// underlying implementation is private to this crate.
+///
+/// [`StageExt::mask`]: crate::staging::StageExt::mask
+/// [`StageExt::final_mask`]: crate::staging::StageExt::final_mask
+pub struct BondingPolynomial<'a, F: Field, R: Rank> {
+    inner: Box<dyn CircuitObject<F, R> + 'a>,
+}
+
+impl<'a, F: Field, R: Rank> BondingPolynomial<'a, F, R> {
+    pub(crate) fn new(inner: Box<dyn CircuitObject<F, R> + 'a>) -> Self {
+        Self { inner }
+    }
+
+    pub(crate) fn into_inner(self) -> Box<dyn CircuitObject<F, R> + 'a> {
+        self.inner
+    }
+
+    /// Evaluates the polynomial $s(x, y)$ for some $x, y \in \mathbb{F}$.
+    pub fn sxy(
+        &self,
+        x: F,
+        y: F,
+        key: &registry::Key<F>,
+        floor_plan: &[floor_planner::ConstraintSegment],
+    ) -> F {
+        self.inner.sxy(x, y, key, floor_plan)
+    }
+
+    /// Computes the polynomial restriction $s(x, Y)$ for some $x \in \mathbb{F}$.
+    pub fn sx(
+        &self,
+        x: F,
+        key: &registry::Key<F>,
+        floor_plan: &[floor_planner::ConstraintSegment],
+    ) -> unstructured::Polynomial<F, R> {
+        self.inner.sx(x, key, floor_plan)
+    }
+
+    /// Computes the polynomial restriction $s(X, y)$ for some $y \in \mathbb{F}$.
+    pub fn sy(
+        &self,
+        y: F,
+        key: &registry::Key<F>,
+        floor_plan: &[floor_planner::ConstraintSegment],
+    ) -> structured::Polynomial<F, R> {
+        self.inner.sy(y, key, floor_plan)
+    }
+
+    /// Returns the number of constraints: `(multiplication, linear)`.
+    pub fn constraint_counts(&self) -> (usize, usize) {
+        self.inner.constraint_counts()
+    }
+
+    /// Returns per-segment constraint records in DFS order.
+    ///
+    /// These records serve as input to
+    /// [`floor_planner::floor_plan`] for computing absolute offsets.
+    pub fn segment_records(&self) -> &[SegmentRecord] {
+        self.inner.segment_records()
+    }
 }

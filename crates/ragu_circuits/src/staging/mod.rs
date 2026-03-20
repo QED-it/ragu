@@ -127,7 +127,7 @@ use ragu_primitives::io::Write;
 use alloc::boxed::Box;
 
 use crate::{
-    Circuit, CircuitObject,
+    BondingPolynomial, Circuit,
     polynomials::{Rank, structured},
 };
 
@@ -285,7 +285,7 @@ impl<F: Field, R: Rank, S: MultiStageCircuit<F, R>> MultiStage<F, R, S> {
     }
 
     /// Proxy for [`S::Last::final_mask`](StageExt::final_mask).
-    pub fn final_mask<'a>(&self) -> Result<Box<dyn CircuitObject<F, R> + 'a>> {
+    pub fn final_mask<'a>(&self) -> Result<BondingPolynomial<'a, F, R>> {
         S::Last::final_mask()
     }
 }
@@ -384,26 +384,26 @@ pub trait StageExt<F: Field, R: Rank>: Stage<F, R> {
         Self::default().rx_configured(witness)
     }
 
-    /// Converts this stage into a circuit object that _only_ enforces
-    /// well-formedness checks on the stage.
+    /// Creates a bonding polynomial that enforces well-formedness checks on
+    /// this stage's partial trace.
     ///
     /// Staging circuits do not behave like normal circuits because they do not
     /// have a `ONE` wire and are used solely for partial trace commitments.
     /// As a result, they must be computed differently.
-    fn mask<'a>() -> Result<Box<dyn CircuitObject<F, R> + 'a>> {
-        Ok(Box::new(mask::StageMask::new(
+    fn mask<'a>() -> Result<BondingPolynomial<'a, F, R>> {
+        Ok(BondingPolynomial::new(Box::new(mask::StageMask::new(
             Self::skip_multiplications(),
             Self::num_multiplications(),
-        )?))
+        )?)))
     }
 
-    /// Creates a circuit object that can be used to enforce well-formedness
+    /// Creates a bonding polynomial that can be used to enforce well-formedness
     /// checks on any final trace (stage) that has this stage as its
     /// [`MultiStageCircuit::Last`] stage.
-    fn final_mask<'a>() -> Result<Box<dyn CircuitObject<F, R> + 'a>> {
-        Ok(Box::new(mask::StageMask::new_final(
-            Self::skip_multiplications() + Self::num_multiplications(),
-        )?))
+    fn final_mask<'a>() -> Result<BondingPolynomial<'a, F, R>> {
+        Ok(BondingPolynomial::new(Box::new(
+            mask::StageMask::new_final(Self::skip_multiplications() + Self::num_multiplications())?,
+        )))
     }
 
     /// Returns the generator index for the i-th A coefficient of this stage.
