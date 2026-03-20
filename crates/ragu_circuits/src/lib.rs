@@ -234,7 +234,7 @@ pub(crate) trait CircuitObject<F: Field, R: Rank>: Send + Sync {
 
     /// Returns per-segment constraint records in DFS order.
     ///
-    /// See [`BondingPolynomial::segment_records`] for details.
+    /// See [`BondingObject::segment_records`] for details.
     fn segment_records(&self) -> &[SegmentRecord];
 }
 
@@ -309,7 +309,7 @@ where
     Ok(Box::new(circuit))
 }
 
-/// An evaluable wiring polynomial $s(X, Y)$ used to enforce well-formedness
+/// An evaluable bonding object $s(X, Y)$ used to enforce well-formedness
 /// of a staged trace.
 ///
 /// Constructed via [`StageExt::mask`] and [`StageExt::final_mask`]; the
@@ -317,11 +317,11 @@ where
 ///
 /// [`StageExt::mask`]: crate::staging::StageExt::mask
 /// [`StageExt::final_mask`]: crate::staging::StageExt::final_mask
-pub struct BondingPolynomial<'a, F: Field, R: Rank> {
+pub struct BondingObject<'a, F: Field, R: Rank> {
     inner: Box<dyn CircuitObject<F, R> + 'a>,
 }
 
-impl<'a, F: Field, R: Rank> BondingPolynomial<'a, F, R> {
+impl<'a, F: Field, R: Rank> BondingObject<'a, F, R> {
     pub(crate) fn new(inner: Box<dyn CircuitObject<F, R> + 'a>) -> Self {
         Self { inner }
     }
