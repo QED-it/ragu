@@ -26,13 +26,13 @@ mod ky;
 mod metrics;
 pub mod polynomials;
 pub mod registry;
-mod rx;
+mod trace;
 mod s;
 pub mod staging;
 mod trivial;
 
 pub use metrics::{RoutineFingerprint, RoutineIdentity, SegmentRecord};
-pub use rx::Trace;
+pub use trace::Trace;
 
 #[cfg(test)]
 mod tests;
@@ -124,11 +124,11 @@ pub trait CircuitExt<F: Field>: Circuit<F> {
     ///
     /// The returned [`Trace`] can be assembled into a polynomial
     /// via [`Registry::assemble`](registry::Registry::assemble).
-    fn rx<'witness>(
+    fn trace<'witness>(
         &self,
         witness: Self::Witness<'witness>,
-    ) -> Result<(rx::Trace<F>, Self::Aux<'witness>)> {
-        rx::eval(self, witness)
+    ) -> Result<(trace::Trace<F>, Self::Aux<'witness>)> {
+        trace::eval(self, witness)
     }
 
     /// Evaluates the instance polynomial $k(y)$ for the given instance at

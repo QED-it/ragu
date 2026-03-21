@@ -64,7 +64,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
             self.params,
             total_circuit_counts(self.num_application_steps).1,
         )
-        .rx(native::circuits::hashes_1::Witness {
+        .trace(native::circuits::hashes_1::Witness {
             unified,
             preamble_witness,
             outer_error_witness,
@@ -81,7 +81,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
             HEADER_SIZE,
             native::RevdotParameters,
         >::new(self.params)
-        .rx(native::circuits::hashes_2::Witness {
+        .trace(native::circuits::hashes_2::Witness {
             unified,
             outer_error_witness,
         })?;
@@ -97,7 +97,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
             HEADER_SIZE,
             native::RevdotParameters,
         >::new()
-        .rx(native::circuits::inner_collapse::Witness {
+        .trace(native::circuits::inner_collapse::Witness {
             preamble_witness,
             unified,
             outer_error_witness,
@@ -115,7 +115,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
             HEADER_SIZE,
             native::RevdotParameters,
         >::new()
-        .rx(native::circuits::outer_collapse::Witness {
+        .trace(native::circuits::outer_collapse::Witness {
             unified,
             preamble_witness,
             outer_error_witness,
@@ -127,7 +127,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
         let outer_collapse_blind = C::CircuitField::random(&mut *rng);
 
         let (compute_v_trace, unified) =
-            native::circuits::compute_v::Circuit::<C, R, HEADER_SIZE>::new().rx(
+            native::circuits::compute_v::Circuit::<C, R, HEADER_SIZE>::new().trace(
                 native::circuits::compute_v::Witness {
                     unified,
                     preamble_witness,

@@ -136,7 +136,7 @@ fn test_simple_circuit() {
     }
 
     let (trace, _) = MySimpleCircuit
-        .rx((
+        .trace((
             Fp::from_raw([
                 1833481853729904510,
                 5119040798866070668,

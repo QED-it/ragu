@@ -42,10 +42,12 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
         let bridge = proof::Bridge::commit(
             self.params,
             rng,
-            nested::stages::query::Stage::<C::HostCurve, R>::rx(&nested::stages::query::Witness {
-                native_query: native_query.rx_triple.commitment,
-                registry_xy: native_query.registry_xy_commitment,
-            })?,
+            nested::stages::query::Stage::<C::HostCurve, R>::rx(
+                &nested::stages::query::Witness {
+                    native_query: native_query.rx_triple.commitment,
+                    registry_xy: native_query.registry_xy_commitment,
+                },
+            )?,
         );
 
         Ok((

@@ -96,8 +96,8 @@ impl Circuit<Fp> for HeavyRoutineCircuit {
     }
 }
 
-fn rx_bench(c: &mut Criterion) {
-    let mut group = c.benchmark_group("rx_heavy_known");
+fn trace_bench(c: &mut Criterion) {
+    let mut group = c.benchmark_group("trace_heavy_known");
     let mut rng = StdRng::seed_from_u64(1234);
     let witness = Fp::random(&mut rng);
 
@@ -106,12 +106,12 @@ fn rx_bench(c: &mut Criterion) {
         let circuit = HeavyRoutineCircuit { calls, depth };
 
         group.bench_with_input(BenchmarkId::from_parameter(calls), &calls, |b, _| {
-            b.iter(|| circuit.rx(witness).unwrap());
+            b.iter(|| circuit.trace(witness).unwrap());
         });
     }
 
     group.finish();
 }
 
-criterion_group!(benches, rx_bench);
+criterion_group!(benches, trace_bench);
 criterion_main!(benches);

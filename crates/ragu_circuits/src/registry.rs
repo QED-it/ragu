@@ -364,7 +364,7 @@ impl<F: PrimeField, R: Rank> Registry<'_, F, R> {
     /// this registry's key and the floor plan for the specified circuit.
     pub fn assemble(
         &self,
-        trace: &crate::rx::Trace<F>,
+        trace: &crate::trace::Trace<F>,
         circuit: CircuitIndex,
     ) -> Result<structured::Polynomial<F, R>> {
         trace.assemble_with_key(&self.key, &self.floor_plans[usize::from(circuit)])

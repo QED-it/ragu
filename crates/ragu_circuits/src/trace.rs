@@ -430,7 +430,7 @@ mod tests {
     use ragu_primitives::Element;
 
     #[test]
-    fn test_rx() {
+    fn test_trace() {
         let circuit = SquareCircuit { times: 10 };
         let witness: Fp = Fp::from(3);
         let (trace, _aux) = eval::<Fp, _>(&circuit, witness).unwrap();

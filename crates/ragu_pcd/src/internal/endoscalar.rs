@@ -453,7 +453,7 @@ mod tests {
 
             let endoscalar_rx = <EndoscalarStage as StageExt<Fp, R>>::rx(endoscalar)?;
             let points_rx = <PointsStage<EpAffine, NUM_POINTS> as StageExt<Fp, R>>::rx(&points)?;
-            let (final_trace, _) = staged.rx(EndoscalingStepWitness {
+            let (final_trace, _) = staged.trace(EndoscalingStepWitness {
                 endoscalar,
                 points: &points,
             })?;
@@ -518,7 +518,7 @@ mod tests {
 
             let staged = MultiStage::new(step_circuit);
 
-            let (final_trace, _) = staged.rx(EndoscalingStepWitness {
+            let (final_trace, _) = staged.trace(EndoscalingStepWitness {
                 endoscalar,
                 points: &points,
             })?;

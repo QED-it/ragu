@@ -41,9 +41,11 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
         let bridge = proof::Bridge::commit(
             self.params,
             rng,
-            nested::stages::eval::Stage::<C::HostCurve, R>::rx(&nested::stages::eval::Witness {
-                native_eval: native_eval.commitment,
-            })?,
+            nested::stages::eval::Stage::<C::HostCurve, R>::rx(
+                &nested::stages::eval::Witness {
+                    native_eval: native_eval.commitment,
+                },
+            )?,
         );
 
         Ok((

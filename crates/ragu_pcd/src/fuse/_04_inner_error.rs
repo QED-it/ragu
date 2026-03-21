@@ -89,10 +89,12 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
                     &builder.a, &builder.b,
                 ),
             };
-        let native_rx =
-            native::stages::inner_error::Stage::<C, R, HEADER_SIZE, native::RevdotParameters>::rx(
-                &inner_error_witness,
-            )?;
+        let native_rx = native::stages::inner_error::Stage::<
+            C,
+            R,
+            HEADER_SIZE,
+            native::RevdotParameters,
+        >::rx(&inner_error_witness)?;
 
         let native_blind = C::CircuitField::random(&mut *rng);
 

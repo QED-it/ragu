@@ -3,7 +3,7 @@
 //! ## Background
 //!
 //! Circuits are evaluated over witnesses in Ragu by having the prover commit to
-//! some polynomial $r(X)$ which [encodes the trace](crate::CircuitExt::rx),
+//! some polynomial $r(X)$ which [encodes the trace](crate::CircuitExt::trace),
 //! and then checking to see if it satisfies the identity
 //!
 //! $$ \langle \kern-0.5em \langle \kern0.1em \mathbf{r}, \mathbf{r} \circ
@@ -326,7 +326,7 @@ pub trait StageExt<F: Field, R: Rank>: Stage<F, R> {
         Self::values().div_ceil(2)
     }
 
-    /// Compute the (partial) trace polynomial $r(X)$ for this stage.
+    /// Compute the (partial) $r(X)$ polynomial for this stage.
     fn rx_configured(&self, witness: Self::Witness<'_>) -> Result<structured::Polynomial<F, R>> {
         let values = {
             let mut dr = Emulator::extractor();
@@ -375,7 +375,7 @@ pub trait StageExt<F: Field, R: Rank>: Stage<F, R> {
         Ok(rx)
     }
 
-    /// Compute the (partial) trace polynomial $r(X)$ for this stage, using a
+    /// Compute the (partial) $r(X)$ polynomial for this stage, using a
     /// default implementation.
     fn rx(witness: Self::Witness<'_>) -> Result<structured::Polynomial<F, R>>
     where

@@ -164,7 +164,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize> Application<'_, C, R, HEADER_S
                 let step_circuit =
                     EndoscalingStep::<C::HostCurve, R, NUM_ENDOSCALING_POINTS>::new(step);
                 let staged = MultiStage::new(step_circuit);
-                let (step_trace, _) = staged.rx(EndoscalingStepWitness {
+                let (step_trace, _) = staged.trace(EndoscalingStepWitness {
                     endoscalar: beta_endo,
                     points: &witness,
                 })?;

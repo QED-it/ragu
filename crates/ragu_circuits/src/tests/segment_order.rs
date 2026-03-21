@@ -1,4 +1,4 @@
-//! Property tests verifying that [`crate::metrics::eval`] and [`crate::rx::eval`]
+//! Property tests verifying that [`crate::metrics::eval`] and [`crate::trace::eval`]
 //! agree on segment count and per-segment multiplication-gate counts, confirming
 //! that both evaluators traverse the routine call tree in identical DFS order.
 
@@ -32,7 +32,7 @@ const MAX_TREE_SIZE: u32 = 30;
 /// `Unknown`.
 ///
 /// When `prediction_is_known` is `true` the routine takes the deferred path in
-/// [`crate::rx`] (returning `Known` from `predict`); when `false` it takes the
+/// [`crate::trace`] (returning `Known` from `predict`); when `false` it takes the
 /// synchronous path (returning `Unknown`). Proptest exercises both values at
 /// every nesting level, covering all combinations of outer and inner prediction
 /// modes that arise in generated trees.
@@ -171,7 +171,7 @@ impl Circuit<Fp> for TreeCircuit {
 }
 
 proptest! {
-    /// Checks that [`crate::metrics::eval`] and [`crate::rx::eval`] agree on
+    /// Checks that [`crate::metrics::eval`] and [`crate::trace::eval`] agree on
     /// segment count and per-segment multiplication-gate counts.
     ///
     /// The two evaluators are implemented independently. Agreement confirms
@@ -183,7 +183,7 @@ proptest! {
 
         let metrics = crate::metrics::eval::<Fp, _>(&circuit)
             .map_err(|e| TestCaseError::fail(format!("metrics: {e:?}")))?;
-        let (trace, _) = crate::rx::eval::<Fp, _>(&circuit, ())
+        let (trace, _) = crate::trace::eval::<Fp, _>(&circuit, ())
             .map_err(|e| TestCaseError::fail(format!("rx: {e:?}")))?;
 
         prop_assert_eq!(

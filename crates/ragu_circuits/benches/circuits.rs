@@ -111,9 +111,9 @@ fn constraint_counts_square(circuit: impl Circuit<Fp> + 'static) {
 }
 
 #[library_benchmark(setup = setup_rng)]
-#[bench::rx_test_rank((f, f))]
-fn rx_test_rank((witness0, witness1): (Fp, Fp)) {
-    black_box(MySimpleCircuit.rx((witness0, witness1))).unwrap();
+#[bench::trace_test_rank((f, f))]
+fn trace_test_rank((witness0, witness1): (Fp, Fp)) {
+    black_box(MySimpleCircuit.trace((witness0, witness1))).unwrap();
 }
 
 #[library_benchmark(setup = setup_with_rng)]
@@ -121,13 +121,13 @@ fn rx_test_rank((witness0, witness1): (Fp, Fp)) {
         (SquareCircuit { times: 2 }, (f,)),
         (SquareCircuit { times: 10 }, (f,)),
     )]
-fn rx_production_rank((circuit, (witness,)): (SquareCircuit, (Fp,))) {
-    black_box(circuit.rx(witness)).unwrap();
+fn trace_production_rank((circuit, (witness,)): (SquareCircuit, (Fp,))) {
+    black_box(circuit.trace(witness)).unwrap();
 }
 
 library_benchmark_group!(
     name = circuit_synthesis;
-    benchmarks = constraint_counts_simple, constraint_counts_square, eval_ky, rx_test_rank, rx_production_rank,
+    benchmarks = constraint_counts_simple, constraint_counts_square, eval_ky, trace_test_rank, trace_production_rank,
 );
 
 #[library_benchmark]
