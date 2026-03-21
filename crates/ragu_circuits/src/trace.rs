@@ -21,10 +21,8 @@ use alloc::{vec, vec::Vec};
 #[cfg(feature = "multicore")]
 use std::sync::mpsc;
 
-use super::{
-    Circuit, DriverScope, Rank, floor_planner::ConstraintSegment, metrics::SegmentRecord, registry,
-    structured,
-};
+use super::{Circuit, DriverScope, Rank, floor_planner::ConstraintSegment, registry, structured};
+use crate::WithAux;
 
 /// A contiguous group of multiplication gates.
 ///
@@ -77,27 +75,6 @@ pub struct Trace<F> {
 }
 
 impl<F: Field> Trace<F> {
-    /// Assembles this trace into a [`structured::Polynomial`] using
-    /// a default [`Key`](registry::Key), without registry
-    /// optimizations.
-    ///
-    /// This is a convenience for tests that need a polynomial from a
-    /// trace but don't have (or need) a full
-    /// [`Registry`](registry::Registry).
-    ///
-    /// **Note:** This synthesizes a trivial floor plan from segment lengths with
-    /// zero linear constraints. It is only correct for traces produced by
-    /// circuits (or stages) that have no linear constraints in any segment.
-    pub fn assemble_trivial<R: Rank>(&self) -> Result<structured::Polynomial<F, R>> {
-        let segment_records: Vec<SegmentRecord> = self
-            .segments
-            .iter()
-            .map(|seg| SegmentRecord::new(seg.a.len(), 0, super::metrics::RoutineIdentity::Root))
-            .collect();
-        let plan = super::floor_planner::floor_plan(&segment_records);
-        self.assemble_with_key(&registry::Key::default(), &plan)
-    }
-
     /// Assembles this trace into a [`structured::Polynomial`] using
     /// the provided registry [`Key`](registry::Key).
     ///
@@ -400,7 +377,7 @@ fn finish<F: Field>(mut segments: Vec<AnnotatedSegment<F>>) -> Trace<F> {
 pub fn eval<'witness, F: Field, C: Circuit<F>>(
     circuit: &C,
     witness: C::Witness<'witness>,
-) -> Result<(Trace<F>, C::Aux<'witness>)> {
+) -> Result<WithAux<Trace<F>, C::Aux<'witness>>> {
     #[cfg(feature = "multicore")]
     {
         let (tx, rx) = mpsc::channel();
@@ -409,9 +386,9 @@ pub fn eval<'witness, F: Field, C: Circuit<F>>(
             let mut evaluator = Evaluator::new(Vec::new(), s, tx);
 
             let aux = {
-                let (io, aux) = circuit.witness(&mut evaluator, Always::maybe_just(|| witness))?;
-                io.write(&mut evaluator, &mut ())?;
-                aux.take()
+                let cw = circuit.witness(&mut evaluator, Always::maybe_just(|| witness))?;
+                cw.output.write(&mut evaluator, &mut ())?;
+                cw.aux.take()
             };
 
             Ok((evaluator.segments, aux))
@@ -422,7 +399,7 @@ pub fn eval<'witness, F: Field, C: Circuit<F>>(
             segments.extend(batch?);
         }
 
-        Ok((finish(segments), aux))
+        Ok(WithAux::new(finish(segments), aux))
     }
 
     #[cfg(not(feature = "multicore"))]
@@ -431,9 +408,9 @@ pub fn eval<'witness, F: Field, C: Circuit<F>>(
             let mut evaluator = Evaluator::new(Vec::new(), s);
 
             let aux = {
-                let (io, aux) = circuit.witness(&mut evaluator, Always::maybe_just(|| witness))?;
-                io.write(&mut evaluator, &mut ())?;
-                aux.take()
+                let cw = circuit.witness(&mut evaluator, Always::maybe_just(|| witness))?;
+                cw.output.write(&mut evaluator, &mut ())?;
+                cw.aux.take()
             };
 
             let mut segments = evaluator.segments;
@@ -441,7 +418,7 @@ pub fn eval<'witness, F: Field, C: Circuit<F>>(
             Ok((segments, aux))
         })?;
 
-        Ok((finish(segments), aux))
+        Ok(WithAux::new(finish(segments), aux))
     }
 }
 
@@ -454,10 +431,10 @@ mod tests {
     use ragu_primitives::Element;
 
     #[test]
-    fn test_rx() {
+    fn test_trace() {
         let circuit = SquareCircuit { times: 10 };
         let witness: Fp = Fp::from(3);
-        let (trace, _aux) = eval::<Fp, _>(&circuit, witness).unwrap();
+        let trace = eval::<Fp, _>(&circuit, witness).unwrap().into_output();
         for seg in &trace.segments {
             for i in 0..seg.a.len() {
                 assert_eq!(seg.a[i] * seg.b[i], seg.c[i]);
@@ -481,7 +458,7 @@ mod tests {
             _buf: &mut B,
         ) -> Result<()> {
             // These calls synthesize constraints during serialization.
-            // If io.write() were removed from rx::eval, they would be lost.
+            // If io.write() were removed from trace::eval, they would be lost.
             dr.mul(|| Ok((Coeff::One, Coeff::One, Coeff::One)))?;
             dr.enforce_zero(|lc| lc)?;
             Ok(())
@@ -509,12 +486,14 @@ mod tests {
             &self,
             dr: &mut D,
             witness: ragu_core::drivers::DriverValue<D, Self::Witness<'witness>>,
-        ) -> Result<(
-            Bound<'dr, D, Self::Output>,
-            ragu_core::drivers::DriverValue<D, Self::Aux<'witness>>,
-        )> {
+        ) -> Result<
+            WithAux<
+                Bound<'dr, D, Self::Output>,
+                ragu_core::drivers::DriverValue<D, Self::Aux<'witness>>,
+            >,
+        > {
             let element = Element::alloc(dr, witness)?;
-            Ok((MulOnWrite { element }, D::unit()))
+            Ok(WithAux::new(MulOnWrite { element }, D::unit()))
         }
     }
 
@@ -522,7 +501,7 @@ mod tests {
     fn test_write_gadget_synthesizes_into_trace() {
         let circuit = MulOnWriteCircuit;
         let witness = Fp::from(42u64);
-        let (trace, _) = eval::<Fp, _>(&circuit, witness).unwrap();
+        let trace = eval::<Fp, _>(&circuit, witness).unwrap().into_output();
 
         let root_gates = trace.segments[0].a.len();
         assert_eq!(

@@ -60,6 +60,7 @@
 
 use ragu_arithmetic::Cycle;
 use ragu_circuits::{
+    WithAux,
     polynomials::Rank,
     staging::{MultiStage, MultiStageCircuit, StageBuilder},
 };
@@ -149,10 +150,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Parameters>
         &self,
         builder: StageBuilder<'a, 'dr, D, R, (), Self::Last>,
         witness: DriverValue<D, Self::Witness<'source>>,
-    ) -> Result<(
-        Bound<'dr, D, Self::Output>,
-        DriverValue<D, Self::Aux<'source>>,
-    )>
+    ) -> Result<WithAux<Bound<'dr, D, Self::Output>, DriverValue<D, Self::Aux<'source>>>>
     where
         Self: 'dr,
     {
@@ -225,6 +223,7 @@ impl<C: Cycle, R: Rank, const HEADER_SIZE: usize, FP: fold_revdot::Parameters>
         };
         unified_output.pre_beta.provide(pre_beta);
 
-        unified_output.finish(dr)
+        let (output, aux) = unified_output.finish(dr)?;
+        Ok(WithAux::new(output, aux))
     }
 }

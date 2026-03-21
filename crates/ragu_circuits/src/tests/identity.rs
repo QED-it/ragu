@@ -11,7 +11,7 @@ use ragu_pasta::Fp;
 use ragu_primitives::{Element, Simulator};
 
 use crate::{
-    Circuit,
+    Circuit, WithAux,
     metrics::{self, RoutineFingerprint, RoutineIdentity},
 };
 
@@ -1342,16 +1342,13 @@ where
         &self,
         dr: &mut D,
         witness: DriverValue<D, Self::Witness<'source>>,
-    ) -> Result<(
-        Bound<'dr, D, Self::Output>,
-        DriverValue<D, Self::Aux<'source>>,
-    )>
+    ) -> Result<WithAux<Bound<'dr, D, Self::Output>, DriverValue<D, Self::Aux<'source>>>>
     where
         Self: 'dr,
     {
         let input = Element::alloc(dr, witness)?;
         let output = dr.routine(self.0.clone(), input)?;
-        Ok((output, D::just(|| ())))
+        Ok(WithAux::new(output, D::just(|| ())))
     }
 }
 

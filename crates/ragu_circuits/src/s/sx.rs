@@ -379,7 +379,7 @@ pub fn eval<F: Field, C: Circuit<F>, R: Rank>(
     evaluator.enforce_registry_key(&key_wire, key)?;
 
     let mut outputs = vec![];
-    let (io, _) = circuit.witness(&mut evaluator, Empty)?;
+    let io = circuit.witness(&mut evaluator, Empty)?.into_output();
     io.write(&mut evaluator, &mut outputs)?;
 
     // Enforcing public inputs

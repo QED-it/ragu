@@ -20,6 +20,7 @@ use ff::{Field, WithSmallOrderMulGroup};
 use pasta_curves::group::{Curve, WnafBase, WnafScalar, prime::PrimeCurveAffine};
 use ragu_arithmetic::{CurveAffine, Uendo};
 use ragu_circuits::{
+    WithAux,
     polynomials::Rank,
     staging::{MultiStageCircuit, Stage, StageBuilder},
 };
@@ -277,10 +278,7 @@ impl<C: CurveAffine, R: Rank, const NUM_POINTS: usize> MultiStageCircuit<C::Base
         &self,
         dr: StageBuilder<'a, 'dr, D, R, (), Self::Last>,
         witness: DriverValue<D, Self::Witness<'source>>,
-    ) -> Result<(
-        Bound<'dr, D, Self::Output>,
-        DriverValue<D, Self::Aux<'source>>,
-    )> {
+    ) -> Result<WithAux<Bound<'dr, D, Self::Output>, DriverValue<D, Self::Aux<'source>>>> {
         let (endoscalar_guard, dr) = dr.add_stage::<EndoscalarStage>()?;
         let (points_guard, dr) = dr.add_stage::<PointsStage<C, NUM_POINTS>>()?;
         let dr = dr.finish();
@@ -321,7 +319,7 @@ impl<C: CurveAffine, R: Rank, const NUM_POINTS: usize> MultiStageCircuit<C::Base
         // Constrain output
         acc.enforce_equal(dr, &points.interstitials[self.step])?;
 
-        Ok(((), D::unit()))
+        Ok(WithAux::new((), D::unit()))
     }
 }
 
@@ -338,7 +336,6 @@ mod tests {
     use ragu_circuits::{
         CircuitExt,
         polynomials::{self},
-        registry,
         staging::{MultiStage, StageExt},
     };
     use ragu_core::{
@@ -348,6 +345,7 @@ mod tests {
     };
     use ragu_pasta::{Ep, EpAffine, Fp, Fq};
     use ragu_primitives::{Endoscalar, vec::Len};
+    use ragu_testing::registry::TestRegistryBuilder;
     use rand::RngExt;
 
     type R = polynomials::ProductionRank;
@@ -441,40 +439,38 @@ mod tests {
         // Run each step through the multi-stage circuit and verify correctness.
         for step in 0..num_steps {
             let step_circuit = EndoscalingStep::<EpAffine, R, NUM_POINTS>::new(step);
+            let mut builder = TestRegistryBuilder::new();
+            let staged_h = builder.register_circuit(MultiStage::new(step_circuit.clone()))?;
+            let endo_mask_h = builder.register_bonding(EndoscalarStage::mask()?);
+            let pts_mask_h = builder.register_bonding(PointsStage::<EpAffine, NUM_POINTS>::mask()?);
+            let final_mask_h =
+                builder.register_bonding(PointsStage::<EpAffine, NUM_POINTS>::final_mask()?);
+            let registry = builder.finalize()?;
 
-            let staged = MultiStage::new(step_circuit.clone());
-
-            let endoscalar_mask = EndoscalarStage::mask()?;
-            let points_mask = PointsStage::<EpAffine, NUM_POINTS>::mask()?;
-            let final_mask = PointsStage::<EpAffine, NUM_POINTS>::final_mask()?;
+            let staged = MultiStage::new(step_circuit);
 
             let endoscalar_rx = <EndoscalarStage as StageExt<Fp, R>>::rx(endoscalar)?;
             let points_rx = <PointsStage<EpAffine, NUM_POINTS> as StageExt<Fp, R>>::rx(&points)?;
-            let key = registry::Key::default();
-            let (final_trace, _) = staged.rx(EndoscalingStepWitness {
-                endoscalar,
-                points: &points,
-            })?;
-            let final_rx = final_trace.assemble_trivial::<R>()?;
+            let final_trace = staged
+                .trace(EndoscalingStepWitness {
+                    endoscalar,
+                    points: &points,
+                })?
+                .into_output();
+            let final_rx = registry.assemble(&final_trace, staged_h)?;
 
             let y = Fp::random(&mut rand::rng());
 
             // Verify revdot identities for each stage.
-            assert_eq!(
-                endoscalar_rx.revdot(&endoscalar_mask.sy(y, &key, &[])),
-                Fp::ZERO
-            );
-            assert_eq!(points_rx.revdot(&points_mask.sy(y, &key, &[])), Fp::ZERO);
-            assert_eq!(final_rx.revdot(&final_mask.sy(y, &key, &[])), Fp::ZERO);
+            assert_eq!(endoscalar_rx.revdot(&registry.y(endo_mask_h, y)), Fp::ZERO);
+            assert_eq!(points_rx.revdot(&registry.y(pts_mask_h, y)), Fp::ZERO);
+            assert_eq!(final_rx.revdot(&registry.y(final_mask_h, y)), Fp::ZERO);
 
             // Verify combined circuit identity.
             let mut lhs = final_rx.clone();
             lhs.add_assign(&endoscalar_rx);
             lhs.add_assign(&points_rx);
-            assert_eq!(
-                lhs.revdot(&staged.sy_trivial::<R>(y, &key)?),
-                staged.ky((), y)?
-            );
+            assert_eq!(lhs.revdot(&registry.y(staged_h, y)), staged.ky((), y)?);
         }
 
         Ok(())
@@ -513,15 +509,22 @@ mod tests {
         // Run each step through the multi-stage circuit.
         for step in 0..num_steps {
             let step_circuit = EndoscalingStep::<EpAffine, R, NUM_POINTS>::new(step);
+            let mut builder = TestRegistryBuilder::new();
+            let staged_h = builder.register_circuit(MultiStage::new(step_circuit.clone()))?;
+            builder.register_bonding(EndoscalarStage::mask()?);
+            builder.register_bonding(PointsStage::<EpAffine, NUM_POINTS>::mask()?);
+            builder.register_bonding(PointsStage::<EpAffine, NUM_POINTS>::final_mask()?);
+            let registry = builder.finalize()?;
 
-            let staged = MultiStage::new(step_circuit.clone());
+            let staged = MultiStage::new(step_circuit);
 
-            let key = registry::Key::default();
-            let (final_trace, _) = staged.rx(EndoscalingStepWitness {
-                endoscalar,
-                points: &points,
-            })?;
-            let final_rx = final_trace.assemble_trivial::<R>()?;
+            let final_trace = staged
+                .trace(EndoscalingStepWitness {
+                    endoscalar,
+                    points: &points,
+                })?
+                .into_output();
+            let final_rx = registry.assemble(&final_trace, staged_h)?;
 
             let y = Fp::random(&mut rand::rng());
 
@@ -532,10 +535,7 @@ mod tests {
             let mut lhs = final_rx.clone();
             lhs.add_assign(&endoscalar_rx);
             lhs.add_assign(&points_rx);
-            assert_eq!(
-                lhs.revdot(&staged.sy_trivial::<R>(y, &key)?),
-                staged.ky((), y)?
-            );
+            assert_eq!(lhs.revdot(&registry.y(staged_h, y)), staged.ky((), y)?);
         }
 
         Ok(())

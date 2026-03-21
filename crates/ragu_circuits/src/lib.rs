@@ -26,13 +26,13 @@ mod ky;
 mod metrics;
 pub mod polynomials;
 pub mod registry;
-mod rx;
 mod s;
 pub mod staging;
+mod trace;
 mod trivial;
 
 pub use metrics::{RoutineFingerprint, RoutineIdentity, SegmentRecord};
-pub use rx::Trace;
+pub use trace::Trace;
 
 #[cfg(test)]
 mod tests;
@@ -48,6 +48,46 @@ use ragu_primitives::io::Write;
 use alloc::boxed::Box;
 
 use polynomials::{Rank, structured, unstructured};
+
+/// Bundles a primary value with auxiliary data.
+///
+/// Returned by [`Circuit::witness`] and [`CircuitExt::trace`] to pair the
+/// circuit's output with any auxiliary data produced during synthesis.
+/// Most circuits set `Aux = ()` and callers can use [`into_output`] to
+/// discard the auxiliary component, [`into_aux`] to discard the output,
+/// or [`into_parts`] to destructure both.
+///
+/// [`into_output`]: WithAux::into_output
+/// [`into_aux`]: WithAux::into_aux
+/// [`into_parts`]: WithAux::into_parts
+pub struct WithAux<O, A> {
+    /// The primary output value.
+    pub(crate) output: O,
+    /// Auxiliary data produced alongside the output.
+    pub(crate) aux: A,
+}
+
+impl<O, A> WithAux<O, A> {
+    /// Creates a new `WithAux` from an output and auxiliary data.
+    pub fn new(output: O, aux: A) -> Self {
+        Self { output, aux }
+    }
+
+    /// Discards auxiliary data, returning only the output.
+    pub fn into_output(self) -> O {
+        self.output
+    }
+
+    /// Discards the output, returning only auxiliary data.
+    pub fn into_aux(self) -> A {
+        self.aux
+    }
+
+    /// Destructures into both components.
+    pub fn into_parts(self) -> (O, A) {
+        (self.output, self.aux)
+    }
+}
 
 /// A trait for drivers that carry per-routine state which must be saved and
 /// restored across routine boundaries.
@@ -110,85 +150,22 @@ pub trait Circuit<F: Field>: Sized + Send + Sync {
         &self,
         dr: &mut D,
         witness: DriverValue<D, Self::Witness<'source>>,
-    ) -> Result<(
-        Bound<'dr, D, Self::Output>,
-        DriverValue<D, Self::Aux<'source>>,
-    )>
+    ) -> Result<WithAux<Bound<'dr, D, Self::Output>, DriverValue<D, Self::Aux<'source>>>>
     where
         Self: 'dr;
 }
 
 /// An extension trait for all circuits.
 pub trait CircuitExt<F: Field>: Circuit<F> {
-    /// Evaluates $s(x, y)$ using the given key and an auto-computed floor plan.
-    fn sxy_trivial<R: Rank>(&self, x: F, y: F, key: &registry::Key<F>) -> Result<F>
-    where
-        F: FromUniformBytes<64>,
-    {
-        let metrics = metrics::eval(self)?;
-        let floor_plan = floor_planner::floor_plan(&metrics.segments);
-        s::sxy::eval::<_, _, R>(self, x, y, key, &floor_plan)
-    }
-
-    /// Computes $s(X, y)$ using the given key and an auto-computed floor plan.
-    fn sy_trivial<R: Rank>(
-        &self,
-        y: F,
-        key: &registry::Key<F>,
-    ) -> Result<structured::Polynomial<F, R>>
-    where
-        F: FromUniformBytes<64>,
-    {
-        let metrics = metrics::eval(self)?;
-        let floor_plan = floor_planner::floor_plan(&metrics.segments);
-        s::sy::eval(self, y, key, &floor_plan)
-    }
-
-    /// Computes $s(x, Y)$ using the given key and an auto-computed floor plan.
-    fn sx_trivial<R: Rank>(
-        &self,
-        x: F,
-        key: &registry::Key<F>,
-    ) -> Result<unstructured::Polynomial<F, R>>
-    where
-        F: FromUniformBytes<64>,
-    {
-        let metrics = metrics::eval(self)?;
-        let floor_plan = floor_planner::floor_plan(&metrics.segments);
-        s::sx::eval(self, x, key, &floor_plan)
-    }
-
-    /// Returns the floor plan computed from circuit metrics, as a
-    /// [`Vec`](alloc::vec::Vec) of [`floor_planner::ConstraintSegment`]s.
-    fn floor_plan_trivial(&self) -> Result<alloc::vec::Vec<floor_planner::ConstraintSegment>>
-    where
-        F: FromUniformBytes<64>,
-    {
-        let metrics = metrics::eval(self)?;
-        Ok(floor_planner::floor_plan(&metrics.segments))
-    }
-
-    /// Returns constraint counts `(multiplication, linear)` from circuit metrics.
-    fn constraint_counts_trivial(&self) -> Result<(usize, usize)>
-    where
-        F: FromUniformBytes<64>,
-    {
-        let metrics = metrics::eval(self)?;
-        Ok((
-            metrics.num_multiplication_constraints,
-            metrics.num_linear_constraints,
-        ))
-    }
-
     /// Computes the trace for this circuit from a witness.
     ///
     /// The returned [`Trace`] can be assembled into a polynomial
     /// via [`Registry::assemble`](registry::Registry::assemble).
-    fn rx<'witness>(
+    fn trace<'witness>(
         &self,
         witness: Self::Witness<'witness>,
-    ) -> Result<(rx::Trace<F>, Self::Aux<'witness>)> {
-        rx::eval(self, witness)
+    ) -> Result<WithAux<trace::Trace<F>, Self::Aux<'witness>>> {
+        trace::eval(self, witness)
     }
 
     /// Evaluates the instance polynomial $k(y)$ for the given instance at
@@ -232,9 +209,10 @@ pub(crate) trait CircuitObject<F: Field, R: Rank>: Send + Sync {
     /// Returns the number of constraints: `(multiplication, linear)`.
     fn constraint_counts(&self) -> (usize, usize);
 
-    /// Returns per-segment constraint records in DFS order.
+    /// Returns per-segment constraint records in DFS synthesis order.
     ///
-    /// See [`BondingObject::segment_records`] for details.
+    /// These records serve as input to [`floor_planner::floor_plan`] for
+    /// computing absolute constraint offsets.
     fn segment_records(&self) -> &[SegmentRecord];
 }
 
@@ -348,49 +326,5 @@ impl<'a, F: Field, R: Rank> BondingObject<'a, F, R> {
 
     pub(crate) fn into_inner(self) -> Box<dyn CircuitObject<F, R> + 'a> {
         self.inner
-    }
-
-    /// Evaluates the polynomial $s(x, y)$ for some $x, y \in \mathbb{F}$.
-    pub fn sxy(
-        &self,
-        x: F,
-        y: F,
-        key: &registry::Key<F>,
-        floor_plan: &[floor_planner::ConstraintSegment],
-    ) -> F {
-        self.inner.sxy(x, y, key, floor_plan)
-    }
-
-    /// Computes the polynomial restriction $s(x, Y)$ for some $x \in \mathbb{F}$.
-    pub fn sx(
-        &self,
-        x: F,
-        key: &registry::Key<F>,
-        floor_plan: &[floor_planner::ConstraintSegment],
-    ) -> unstructured::Polynomial<F, R> {
-        self.inner.sx(x, key, floor_plan)
-    }
-
-    /// Computes the polynomial restriction $s(X, y)$ for some $y \in \mathbb{F}$.
-    pub fn sy(
-        &self,
-        y: F,
-        key: &registry::Key<F>,
-        floor_plan: &[floor_planner::ConstraintSegment],
-    ) -> structured::Polynomial<F, R> {
-        self.inner.sy(y, key, floor_plan)
-    }
-
-    /// Returns the number of constraints: `(multiplication, linear)`.
-    pub fn constraint_counts(&self) -> (usize, usize) {
-        self.inner.constraint_counts()
-    }
-
-    /// Returns per-segment constraint records in DFS order.
-    ///
-    /// These records serve as input to
-    /// [`floor_planner::floor_plan`] for computing absolute offsets.
-    pub fn segment_records(&self) -> &[SegmentRecord] {
-        self.inner.segment_records()
     }
 }

@@ -3,7 +3,7 @@
 //! ## Background
 //!
 //! Circuits are evaluated over witnesses in Ragu by having the prover commit to
-//! some polynomial $r(X)$ which [encodes the trace](crate::CircuitExt::rx),
+//! some polynomial $r(X)$ which [encodes the trace](crate::CircuitExt::trace),
 //! and then checking to see if it satisfies the identity
 //!
 //! $$ \langle \kern-0.5em \langle \kern0.1em \mathbf{r}, \mathbf{r} \circ
@@ -66,10 +66,12 @@
 //! ```rust,ignore
 //! let a = MyStage::rx(my_stage_witness)?;
 //!
-//! let mask = MyStage::mask()?;
+//! // Register the mask into a registry to obtain s(X, y).
+//! let mask_handle = builder.register_bonding(MyStage::mask()?);
+//! let registry = builder.finalize()?;
+//!
 //! let y = Fp::random(&mut rand::rng());
-//! let registry_key = Fp::random(&mut rand::rng());
-//! assert_eq!(a.revdot(&mask.sy(y, registry_key)), Fp::ZERO);
+//! assert_eq!(a.revdot(&registry.y(mask_handle, y)), Fp::ZERO);
 //! ```
 //!
 //! If two or more stage polynomials must satisfy the same well-formedness
@@ -86,10 +88,11 @@
 //! combined.scale(z);
 //! combined.add_assign(&b);
 //!
-//! let mask = MyStage::mask()?;
+//! let mask_handle = builder.register_bonding(MyStage::mask()?);
+//! let registry = builder.finalize()?;
+//!
 //! let y = Fp::random(&mut rand::rng());
-//! let registry_key = Fp::random(&mut rand::rng());
-//! assert_eq!(combined.revdot(&mask.sy(y, registry_key)), Fp::ZERO);
+//! assert_eq!(combined.revdot(&registry.y(mask_handle, y)), Fp::ZERO);
 //! ```
 //!
 //! ### Final Stage
@@ -127,7 +130,7 @@ use ragu_primitives::io::Write;
 use alloc::boxed::Box;
 
 use crate::{
-    BondingObject, Circuit,
+    BondingObject, Circuit, WithAux,
     polynomials::{Rank, structured},
 };
 
@@ -251,10 +254,7 @@ pub trait MultiStageCircuit<F: Field, R: Rank>: Sized + Send + Sync {
         &self,
         dr: StageBuilder<'a, 'dr, D, R, (), Self::Last>,
         witness: DriverValue<D, Self::Witness<'source>>,
-    ) -> Result<(
-        Bound<'dr, D, Self::Output>,
-        DriverValue<D, Self::Aux<'source>>,
-    )>
+    ) -> Result<WithAux<Bound<'dr, D, Self::Output>, DriverValue<D, Self::Aux<'source>>>>
     where
         Self: 'dr;
 }
@@ -311,7 +311,7 @@ impl<F: Field, R: Rank, S: MultiStageCircuit<F, R>> Circuit<F> for MultiStage<F,
         &self,
         dr: &mut D,
         witness: DriverValue<D, S::Witness<'source>>,
-    ) -> Result<(Bound<'dr, D, Self::Output>, DriverValue<D, S::Aux<'source>>)>
+    ) -> Result<WithAux<Bound<'dr, D, Self::Output>, DriverValue<D, S::Aux<'source>>>>
     where
         Self: 'dr,
     {
@@ -326,7 +326,7 @@ pub trait StageExt<F: Field, R: Rank>: Stage<F, R> {
         Self::values().div_ceil(2)
     }
 
-    /// Compute the (partial) trace polynomial $r(X)$ for this stage.
+    /// Compute the (partial) $r(X)$ polynomial for this stage.
     fn rx_configured(&self, witness: Self::Witness<'_>) -> Result<structured::Polynomial<F, R>> {
         let values = {
             let mut dr = Emulator::extractor();
@@ -375,7 +375,7 @@ pub trait StageExt<F: Field, R: Rank>: Stage<F, R> {
         Ok(rx)
     }
 
-    /// Compute the (partial) trace polynomial $r(X)$ for this stage, using a
+    /// Compute the (partial) $r(X)$ polynomial for this stage, using a
     /// default implementation.
     fn rx(witness: Self::Witness<'_>) -> Result<structured::Polynomial<F, R>>
     where

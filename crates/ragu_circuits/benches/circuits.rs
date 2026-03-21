@@ -7,6 +7,7 @@ use std::hint::black_box;
 use gungraun::{library_benchmark, library_benchmark_group, main};
 use ragu_arithmetic::Cycle;
 use ragu_circuits::polynomials::{ProductionRank, TestRank, structured, unstructured};
+use ragu_circuits::registry::CircuitIndex;
 use ragu_circuits::registry::{Registry, RegistryBuilder};
 use ragu_circuits::{Circuit, CircuitExt};
 use ragu_pasta::{Fp, Pasta};
@@ -89,20 +90,30 @@ fn eval_ky((a, b, y): (Fp, Fp, Fp)) {
 
 #[library_benchmark]
 #[bench::simple(MySimpleCircuit)]
-fn constraint_counts_simple(circuit: impl Circuit<Fp>) {
-    black_box(CircuitExt::<Fp>::constraint_counts_trivial(&circuit)).unwrap();
+fn constraint_counts_simple(circuit: impl Circuit<Fp> + 'static) {
+    let registry = RegistryBuilder::<Fp, TestRank>::new()
+        .register_internal_circuit(circuit)
+        .unwrap()
+        .finalize()
+        .unwrap();
+    black_box(registry.constraint_counts(CircuitIndex::new(0)));
 }
 
 #[library_benchmark]
 #[benches::multiple( SquareCircuit { times: 2 }, SquareCircuit { times: 10 },)]
-fn constraint_counts_square(circuit: impl Circuit<Fp>) {
-    black_box(CircuitExt::<Fp>::constraint_counts_trivial(&circuit)).unwrap();
+fn constraint_counts_square(circuit: impl Circuit<Fp> + 'static) {
+    let registry = RegistryBuilder::<Fp, TestRank>::new()
+        .register_internal_circuit(circuit)
+        .unwrap()
+        .finalize()
+        .unwrap();
+    black_box(registry.constraint_counts(CircuitIndex::new(0)));
 }
 
 #[library_benchmark(setup = setup_rng)]
-#[bench::rx_test_rank((f, f))]
-fn rx_test_rank((witness0, witness1): (Fp, Fp)) {
-    black_box(MySimpleCircuit.rx((witness0, witness1))).unwrap();
+#[bench::trace_test_rank((f, f))]
+fn trace_test_rank((witness0, witness1): (Fp, Fp)) {
+    black_box(MySimpleCircuit.trace((witness0, witness1))).unwrap();
 }
 
 #[library_benchmark(setup = setup_with_rng)]
@@ -110,13 +121,13 @@ fn rx_test_rank((witness0, witness1): (Fp, Fp)) {
         (SquareCircuit { times: 2 }, (f,)),
         (SquareCircuit { times: 10 }, (f,)),
     )]
-fn rx_production_rank((circuit, (witness,)): (SquareCircuit, (Fp,))) {
-    black_box(circuit.rx(witness)).unwrap();
+fn trace_production_rank((circuit, (witness,)): (SquareCircuit, (Fp,))) {
+    black_box(circuit.trace(witness)).unwrap();
 }
 
 library_benchmark_group!(
     name = circuit_synthesis;
-    benchmarks = constraint_counts_simple, constraint_counts_square, eval_ky, rx_test_rank, rx_production_rank,
+    benchmarks = constraint_counts_simple, constraint_counts_square, eval_ky, trace_test_rank, trace_production_rank,
 );
 
 #[library_benchmark]

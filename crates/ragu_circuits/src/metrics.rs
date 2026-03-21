@@ -165,18 +165,6 @@ pub struct SegmentRecord {
 }
 
 impl SegmentRecord {
-    pub(crate) fn new(
-        num_multiplication_constraints: usize,
-        num_linear_constraints: usize,
-        identity: RoutineIdentity,
-    ) -> Self {
-        Self {
-            num_multiplication_constraints,
-            num_linear_constraints,
-            identity,
-        }
-    }
-
     /// The number of multiplication constraints in this segment.
     pub fn num_multiplication_constraints(&self) -> usize {
         self.num_multiplication_constraints
@@ -450,7 +438,7 @@ impl<'dr, F: FromUniformBytes<64>> Driver<'dr> for Counter<F> {
         // fingerprint captures only internal structure, not caller context.
         // Uncounted: these gates only seed the geometric sequences.
         let new_input = self.uncounted(|c| Ro::Input::map_gadget(&input, c))?;
-        self.scope.available_b = None; // match sxy/rx initial state
+        self.scope.available_b = None; // match sxy/trace initial state
 
         // Predict and execute.
         let aux = Emulator::predict(&routine, &new_input)?.into_aux();
@@ -546,7 +534,7 @@ pub fn eval<F: FromUniformBytes<64>, C: Circuit<F>>(circuit: &C) -> Result<Circu
     collector.enforce_zero(|lc| lc)?;
 
     // Circuit synthesis
-    let (io, _) = circuit.witness(&mut collector, Empty)?;
+    let io = circuit.witness(&mut collector, Empty)?.into_output();
     io.write(&mut collector, &mut degree_ky)?;
 
     // Public output constraints
@@ -601,6 +589,7 @@ pub fn eval<F: FromUniformBytes<64>, C: Circuit<F>>(circuit: &C) -> Result<Circu
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    use crate::WithAux;
     use core::marker::PhantomData;
     use ragu_core::{
         drivers::{Driver, DriverValue},
@@ -727,12 +716,10 @@ pub(crate) mod tests {
             &self,
             dr: &mut D,
             _witness: DriverValue<D, Self::Witness<'source>>,
-        ) -> Result<(
-            Bound<'dr, D, Self::Output>,
-            DriverValue<D, Self::Aux<'source>>,
-        )> {
+        ) -> Result<WithAux<Bound<'dr, D, Self::Output>, DriverValue<D, Self::Aux<'source>>>>
+        {
             dr.routine(DanglingAllocRoutine, ())?;
-            Ok(((), D::unit()))
+            Ok(WithAux::new((), D::unit()))
         }
     }
 

@@ -253,7 +253,7 @@ mod tests {
     use rand::RngExt;
 
     use crate::{
-        CircuitExt, CircuitObject, metrics,
+        CircuitObject, WithAux, floor_planner, into_circuit_object, metrics,
         polynomials::{Rank, structured},
         registry,
         staging::StageBuilder,
@@ -283,10 +283,8 @@ mod tests {
             &self,
             dr: &mut D,
             _: DriverValue<D, Self::Witness<'source>>,
-        ) -> Result<(
-            Bound<'dr, D, Self::Output>,
-            DriverValue<D, Self::Aux<'source>>,
-        )> {
+        ) -> Result<WithAux<Bound<'dr, D, Self::Output>, DriverValue<D, Self::Aux<'source>>>>
+        {
             let reserved = self.skip_multiplications + self.num_multiplications + 1;
             assert!(reserved <= R::n());
 
@@ -308,7 +306,7 @@ mod tests {
                 dr.enforce_zero(|lc| lc.add(&c))?;
             }
 
-            Ok(((), D::unit()))
+            Ok(WithAux::new((), D::unit()))
         }
     }
 
@@ -402,8 +400,8 @@ mod tests {
         let rx1_b = MyStage1::rx(endoscalar_b)?;
         let rx2 = MyStage2::rx((p1, p2))?;
 
-        let circ1 = MyStage1::mask()?;
-        let circ2 = MyStage2::mask()?;
+        let circ1 = MyStage1::mask()?.into_inner();
+        let circ2 = MyStage2::mask()?.into_inner();
 
         let z = Fp::random(&mut rand::rng());
         let y = Fp::random(&mut rand::rng());
@@ -457,19 +455,22 @@ mod tests {
         let k = registry::Key::new(Fp::random(&mut rand::rng()));
 
         let x_4n_minus_1 = x.pow_vartime([(4 * R::n() - 1) as u64]);
-        let comparison_sxy = stage.sxy_trivial::<R>(x, y, &k).unwrap() - x_4n_minus_1;
+        let generic = into_circuit_object::<_, _, R>(stage.clone()).unwrap();
+        let plan = floor_planner::floor_plan(generic.segment_records());
+        let comparison_sxy = generic.sxy(x, y, &k, &plan) - x_4n_minus_1;
 
         assert_eq!(stage.sxy(x, y, &k, &[]), comparison_sxy);
     }
 
     #[test]
     fn test_minimum_linear_constraints() {
-        let circuit = SquareCircuit { times: 2 };
+        let circuit = into_circuit_object::<_, _, R>(SquareCircuit { times: 2 }).unwrap();
         let y = Fp::random(&mut rand::rng());
         let k = registry::Key::new(Fp::random(&mut rand::rng()));
 
-        let (_, num_linear_constraints) = circuit.constraint_counts_trivial().unwrap();
-        let mut sy = circuit.sy_trivial::<R>(y, &k).unwrap();
+        let (_, num_linear_constraints) = circuit.constraint_counts();
+        let plan = floor_planner::floor_plan(circuit.segment_records());
+        let mut sy = circuit.sy(y, &k, &plan);
 
         // The first gate (ONE gate) should have the highest y-power.
         let expected_y_power = num_linear_constraints - 1;
@@ -489,8 +490,8 @@ mod tests {
         // the ONE constraint from metrics::eval(), so its num_linear_constraints
         // must be at least 2.  This invariant prevents the `- 1` underflow in
         // sy::eval's initial y-power computation.
-        let circuit = SquareCircuit { times: 0 };
-        let floor_plan = circuit.floor_plan_trivial().unwrap();
+        let circuit = into_circuit_object::<_, _, R>(SquareCircuit { times: 0 }).unwrap();
+        let floor_plan = floor_planner::floor_plan(circuit.segment_records());
         assert!(
             floor_plan[0].num_linear_constraints >= 2,
             "root segment must have at least 2 linear constraints (registry key + ONE), got {}",
@@ -550,17 +551,22 @@ mod tests {
 
             let k = registry::Key::new(Fp::random(&mut rand::rng()));
 
+            let generic = into_circuit_object::<_, _, R>(
+                StageMask::<R>::new(skip, num).unwrap()
+            ).unwrap();
+            let plan = floor_planner::floor_plan(generic.segment_records());
+
             let check = |x: Fp, y: Fp| {
                 let x_4n_minus_1 = x.pow_vartime([(4 * R::n() - 1) as u64]);
 
                 // This adjusts for the single "ONE" constraint which is always skipped
                 // in staging witnesses.
-                let sxy = stage_mask.sxy_trivial::<R>(x, y, &k).unwrap() - x_4n_minus_1;
-                let mut sx = stage_mask.sx_trivial::<R>(x, &k).unwrap();
+                let sxy = generic.sxy(x, y, &k, &plan) - x_4n_minus_1;
+                let mut sx = generic.sx(x, &k, &plan);
                 {
                     sx[0] -= x_4n_minus_1;
                 }
-                let mut sy = stage_mask.sy_trivial::<R>(y, &k).unwrap();
+                let mut sy = generic.sy(y, &k, &plan);
                 {
                     let sy = sy.backward();
                     sy.c[0] -= Fp::ONE;
@@ -645,7 +651,7 @@ mod tests {
 
         let rx = ConstrainedStage::rx(valid_witness).unwrap();
 
-        let stage_mask = ConstrainedStage::mask::<'_>().unwrap();
+        let stage_mask = ConstrainedStage::mask::<'_>().unwrap().into_inner();
 
         // rx.revdot(&stage_mask) == 0 for well-formed stages
         let y = Fp::random(&mut rand::rng());
@@ -737,16 +743,15 @@ mod tests {
                 &self,
                 dr: &mut D,
                 _witness: DriverValue<D, Self::Witness<'source>>,
-            ) -> Result<(
-                Bound<'dr, D, Self::Output>,
-                DriverValue<D, Self::Aux<'source>>,
-            )> {
+            ) -> Result<WithAux<Bound<'dr, D, Self::Output>, DriverValue<D, Self::Aux<'source>>>>
+            {
                 dr.routine(MulOnlyRoutine, ())?;
-                Ok(((), D::unit()))
+                Ok(WithAux::new((), D::unit()))
             }
         }
 
-        let floor_plan = TestCircuit.floor_plan_trivial().unwrap();
+        let circuit = into_circuit_object::<_, _, R>(TestCircuit).unwrap();
+        let floor_plan = floor_planner::floor_plan(circuit.segment_records());
 
         // The child routine (index 1) should have zero linear constraints.
         assert_eq!(
@@ -759,9 +764,9 @@ mod tests {
         let k = registry::Key::new(Fp::random(&mut rand::rng()));
 
         // None of these must panic — previously sy would underflow on `- 1`.
-        let sxy = TestCircuit.sxy_trivial::<R>(x, y, &k).unwrap();
-        let sx = TestCircuit.sx_trivial::<R>(x, &k).unwrap();
-        let sy = TestCircuit.sy_trivial::<R>(y, &k).unwrap();
+        let sxy = circuit.sxy(x, y, &k, &floor_plan);
+        let sx = circuit.sx(x, &k, &floor_plan);
+        let sy = circuit.sy(y, &k, &floor_plan);
 
         assert_eq!(sxy, sx.eval(y));
         assert_eq!(sxy, sy.eval(x));

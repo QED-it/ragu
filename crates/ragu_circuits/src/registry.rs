@@ -364,7 +364,7 @@ impl<F: PrimeField, R: Rank> Registry<'_, F, R> {
     /// this registry's key and the floor plan for the specified circuit.
     pub fn assemble(
         &self,
-        trace: &crate::rx::Trace<F>,
+        trace: &crate::trace::Trace<F>,
         circuit: CircuitIndex,
     ) -> Result<structured::Polynomial<F, R>> {
         trace.assemble_with_key(&self.key, &self.floor_plans[usize::from(circuit)])
@@ -411,6 +411,13 @@ impl<F: PrimeField, R: Rank> Registry<'_, F, R> {
     pub fn circuit_y(&self, i: CircuitIndex, y: F) -> structured::Polynomial<F, R> {
         let w: F = i.omega_j();
         self.at(w).y(y)
+    }
+
+    /// Evaluates $s_i(x, y)$ for circuit `i` at point $(x, y)$.
+    ///
+    /// See [`CircuitIndex::omega_j`] for details on the $\omega^j$ mapping.
+    pub fn circuit_xy(&self, i: CircuitIndex, x: F, y: F) -> F {
+        self.wxy(i.omega_j(), x, y)
     }
 
     /// Returns true if the circuit's $\omega^j$ value is in the registry domain.

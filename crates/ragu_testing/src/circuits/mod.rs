@@ -6,7 +6,7 @@
 //! - [`SquareCircuit`]: Parameterized circuit that squares an input `times` times.
 
 use ff::Field;
-use ragu_circuits::Circuit;
+use ragu_circuits::{Circuit, WithAux};
 use ragu_core::{
     Result,
     drivers::{Driver, DriverValue, LinearExpression},
@@ -40,10 +40,7 @@ impl<F: Field> Circuit<F> for MySimpleCircuit {
         &self,
         dr: &mut D,
         witness: DriverValue<D, Self::Witness<'witness>>,
-    ) -> Result<(
-        Bound<'dr, D, Self::Output>,
-        DriverValue<D, Self::Aux<'witness>>,
-    )> {
+    ) -> Result<WithAux<Bound<'dr, D, Self::Output>, DriverValue<D, Self::Aux<'witness>>>> {
         let a = Element::alloc(dr, witness.as_ref().map(|w| w.0))?;
         let b = Element::alloc(dr, witness.as_ref().map(|w| w.1))?;
 
@@ -58,7 +55,7 @@ impl<F: Field> Circuit<F> for MySimpleCircuit {
         let c = a.add(dr, &b);
         let d = a.sub(dr, &b);
 
-        Ok(((c, d), D::unit()))
+        Ok(WithAux::new((c, d), D::unit()))
     }
 }
 
@@ -89,16 +86,13 @@ impl<F: Field> Circuit<F> for SquareCircuit {
         &self,
         dr: &mut D,
         witness: DriverValue<D, Self::Witness<'witness>>,
-    ) -> Result<(
-        Bound<'dr, D, Self::Output>,
-        DriverValue<D, Self::Aux<'witness>>,
-    )> {
+    ) -> Result<WithAux<Bound<'dr, D, Self::Output>, DriverValue<D, Self::Aux<'witness>>>> {
         let mut a = Element::alloc(dr, witness)?;
 
         for _ in 0..self.times {
             a = a.square(dr)?;
         }
 
-        Ok((a, D::unit()))
+        Ok(WithAux::new(a, D::unit()))
     }
 }
