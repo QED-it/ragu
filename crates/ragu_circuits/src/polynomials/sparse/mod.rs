@@ -188,13 +188,15 @@ impl<T, R: Rank> Polynomial<T, R> {
 }
 
 impl<F: Field, R: Rank> Polynomial<F, R> {
-    /// Iterates over the coefficients of this polynomial in ascending order of
-    /// degree, yielding `F::ZERO` for gaps between blocks.
+    /// Returns an iterator over the coefficients of this polynomial in
+    /// ascending degree order, yielding `F::ZERO` for gaps between blocks.
     pub fn iter_coeffs(&self) -> impl DoubleEndedIterator<Item = F> + ExactSizeIterator + '_ {
         CoeffIter {
             blocks: &self.blocks,
             front: 0,
             back: R::num_coeffs(),
+            front_block: 0,
+            back_block: self.blocks.len(),
         }
     }
 
@@ -441,26 +443,16 @@ impl<F: Field, R: Rank> Polynomial<F, R> {
     }
 }
 
-/// Iterator over all coefficients of a sparse polynomial in ascending degree
-/// order, yielding `F::ZERO` for gaps between blocks.
+/// An iterator over all coefficients of a sparse polynomial in ascending
+/// degree order, yielding `F::ZERO` for gaps between blocks.
 struct CoeffIter<'a, F> {
     blocks: &'a [(usize, Vec<F>)],
     front: usize,
     back: usize,
-}
-
-impl<F: Field> CoeffIter<'_, F> {
-    fn get(&self, pos: usize) -> F {
-        for (start, data) in self.blocks {
-            if pos < *start {
-                break;
-            }
-            if pos < *start + data.len() {
-                return data[pos - *start];
-            }
-        }
-        F::ZERO
-    }
+    /// Index of the first block whose end extends past `front`.
+    front_block: usize,
+    /// One past the last block whose start is at or before `back - 1`.
+    back_block: usize,
 }
 
 impl<F: Field> Iterator for CoeffIter<'_, F> {
@@ -470,7 +462,24 @@ impl<F: Field> Iterator for CoeffIter<'_, F> {
         if self.front >= self.back {
             return None;
         }
-        let val = self.get(self.front);
+        // Advance past blocks fully before `front`.
+        while self.front_block < self.blocks.len() {
+            let (start, data) = &self.blocks[self.front_block];
+            if *start + data.len() > self.front {
+                break;
+            }
+            self.front_block += 1;
+        }
+        let val = if self.front_block < self.blocks.len() {
+            let (start, data) = &self.blocks[self.front_block];
+            if self.front >= *start {
+                data[self.front - *start]
+            } else {
+                F::ZERO
+            }
+        } else {
+            F::ZERO
+        };
         self.front += 1;
         Some(val)
     }
@@ -487,7 +496,25 @@ impl<F: Field> DoubleEndedIterator for CoeffIter<'_, F> {
             return None;
         }
         self.back -= 1;
-        Some(self.get(self.back))
+        // Retreat past blocks that start after `back`.
+        while self.back_block > 0 {
+            let (start, _) = &self.blocks[self.back_block - 1];
+            if *start <= self.back {
+                break;
+            }
+            self.back_block -= 1;
+        }
+        let val = if self.back_block > 0 {
+            let (start, data) = &self.blocks[self.back_block - 1];
+            if self.back < *start + data.len() {
+                data[self.back - *start]
+            } else {
+                F::ZERO
+            }
+        } else {
+            F::ZERO
+        };
+        Some(val)
     }
 }
 

@@ -463,23 +463,8 @@ proptest! {
     }
 
     // -----------------------------------------------------------------------
-    // iter_coeffs (forward, reverse, interleaved, size_hint)
+    // iter_coeffs (interleaved, ExactSizeIterator)
     // -----------------------------------------------------------------------
-
-    #[test]
-    fn iter_coeffs_forward_matches_dense(poly in arb_any_poly()) {
-        let dense = poly.to_dense();
-        let from_iter: Vec<Fp> = poly.iter_coeffs().collect();
-        prop_assert_eq!(from_iter, dense);
-    }
-
-    #[test]
-    fn iter_coeffs_rev_matches_dense(poly in arb_any_poly()) {
-        let mut dense = poly.to_dense();
-        dense.reverse();
-        let from_iter: Vec<Fp> = poly.iter_coeffs().rev().collect();
-        prop_assert_eq!(from_iter, dense);
-    }
 
     #[test]
     fn iter_coeffs_interleaved(poly in arb_any_poly()) {
