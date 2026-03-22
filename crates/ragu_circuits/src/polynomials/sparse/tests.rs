@@ -439,7 +439,7 @@ proptest! {
 
     #[test]
     fn commit_matches_dense(poly in arb_any_poly(), blind in arb_fe()) {
-        use ragu_arithmetic::Cycle;
+        use ragu_arithmetic::{Cycle, FixedGenerators};
         use ragu_pasta::Pasta;
 
         let pasta = Pasta::baked();
@@ -447,9 +447,17 @@ proptest! {
 
         let sparse_commit = poly.commit_to_affine(generators, blind);
 
-        let dense_poly =
-            crate::polynomials::unstructured::Polynomial::<Fp, R>::from_coeffs(poly.to_dense());
-        let dense_commit = dense_poly.commit_to_affine(generators, blind);
+        // Compute commitment from the dense representation directly.
+        let dense = poly.to_dense();
+        let dense_commit: <Pasta as Cycle>::HostCurve = ragu_arithmetic::mul(
+            dense.iter().chain(core::iter::once(&blind)),
+            generators
+                .g()
+                .iter()
+                .take(dense.len())
+                .chain(core::iter::once(generators.h())),
+        )
+        .into();
 
         prop_assert_eq!(sparse_commit, dense_commit);
     }

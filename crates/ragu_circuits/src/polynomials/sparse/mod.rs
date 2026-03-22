@@ -204,13 +204,18 @@ impl<T, R: Rank> Polynomial<T, R> {
 
 impl<F: Field, R: Rank> Polynomial<F, R> {
     /// Expands to a dense coefficient vector of length `R::num_coeffs()`.
-    #[cfg(test)]
-    fn to_dense(&self) -> Vec<F> {
+    pub(crate) fn to_dense(&self) -> Vec<F> {
         let mut dense = alloc::vec![F::ZERO; R::num_coeffs()];
         for (start, data) in &self.blocks {
             dense[*start..*start + data.len()].copy_from_slice(data);
         }
         dense
+    }
+
+    /// Iterates over the coefficients of this polynomial in ascending order of
+    /// degree, yielding `F::ZERO` for gaps between blocks.
+    pub fn iter_coeffs(&self) -> impl DoubleEndedIterator<Item = F> + ExactSizeIterator + '_ {
+        self.to_dense().into_iter()
     }
 
     /// Merges another polynomial into this one using the given binary
@@ -428,5 +433,11 @@ impl<F: Field, R: Rank> ragu_arithmetic::Ring for Polynomial<F, R> {
     }
     fn sub_assign(r: &mut Self, other: &Self) {
         Polynomial::sub_assign(r, other);
+    }
+}
+
+impl<F: Field, R: Rank> core::ops::AddAssign<&Self> for Polynomial<F, R> {
+    fn add_assign(&mut self, rhs: &Self) {
+        Polynomial::add_assign(self, rhs);
     }
 }
