@@ -642,7 +642,7 @@ impl<'table, 'sy, F: Field, R: Rank> Driver<'table> for Evaluator<'table, 'sy, '
 
 /// Evaluates the wiring polynomial $s(X, y)$ at a fixed $y$.
 ///
-/// Returns a structured polynomial in $X$ with coefficients computed via
+/// Returns a sparse polynomial in $X$ with coefficients computed via
 /// deferred evaluation through virtual wires. See the [module
 /// documentation](self) for the algorithm overview.
 ///
