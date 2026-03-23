@@ -1,129 +1,192 @@
-//! Bonding polynomial construction from routing constraints.
+//! Bonding polynomials for multi-stage circuits.
 //!
-//! A bonding polynomial is a wiring polynomial that only encodes linear
-//! constraints. It has no witness and no trace polynomial — it is checked
-//! via revdot against traces produced by other circuits or stages.
+//! This module produces a [`BondingObject`] from any [`MultiStageCircuit`]
+//! whose witness uses only linear constraints: [`Driver::alloc`],
+//! [`Driver::add`], and [`Driver::enforce_zero`] with normal wires (no
+//! [`Driver::mul`], [`Driver::constant`], or `ONE`-wire references). Because
+//! the circuit has no multiplication gates, it needs no final trace of its own
+//! and exists purely to enforce wiring between stages.
 //!
-//! [`StageMask`](super::mask::StageMask) is one factory (hand-optimized for
-//! stage well-formedness). This module provides the machinery to build bonding
-//! polynomials from [`MultiStageCircuit::routing`](super::MultiStageCircuit::routing)
-//! declarations — suitable for routing polynomials and other cross-stage
-//! linear constraints.
+//! The `ONE`-wire contribution is stripped so that the constant term in $Y$ is
+//! zero, as required of a bonding polynomial. [`StageMask`] is a hand-optimized
+//! bonding polynomial for stage well-formedness masks.
 //!
-//! These are kept as separate factories rather than generalizing `StageMask`
-//! because `StageMask` pushes coefficients sequentially per gate, while
-//! routing constraints span multiple gates in a single `enforce_zero` call,
-//! requiring random access to coefficient positions.
+//! [`Driver::mul`]: ragu_core::drivers::Driver::mul
+//! [`Driver::add`]: ragu_core::drivers::Driver::add
+//! [`Driver::alloc`]: ragu_core::drivers::Driver::alloc
+//! [`Driver::constant`]: ragu_core::drivers::Driver::constant
+//! [`Driver::enforce_zero`]: ragu_core::drivers::Driver::enforce_zero
+//! [`StageMask`]: super::mask::StageMask
 
 use ff::{Field, FromUniformBytes};
 use ragu_arithmetic::Coeff;
 use ragu_core::{
     Result,
-    drivers::{Driver, DriverValue},
-    gadgets::Bound,
+    drivers::{Driver, DriverTypes, LinearExpression},
+    maybe::Empty,
 };
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::boxed::Box;
 
 use crate::{
     BondingObject, Circuit, CircuitObject, SegmentRecord,
     floor_planner::ConstraintSegment,
-    metrics,
-    polynomials::{Rank, structured, unstructured},
-    registry, s,
+    into_circuit_object,
+    polynomials::{Rank, sparse},
+    registry,
 };
 
-/// Build a [`BondingObject`] from a
-/// [`MultiStageCircuit`](super::MultiStageCircuit)'s routing constraints.
-///
-/// Returns `None` if `S::num_routing_gates()` is zero (no routing).
-pub(crate) fn routing_object<'a, F, R, S>() -> Result<Option<BondingObject<'a, F, R>>>
+use super::{MultiStage, MultiStageCircuit};
+
+impl<F, R, S> MultiStage<F, R, S>
 where
     F: FromUniformBytes<64>,
     R: Rank,
-    S: super::MultiStageCircuit<F, R> + 'a,
+    S: MultiStageCircuit<F, R>,
 {
-    if S::num_routing_gates() == 0 {
-        return Ok(None);
-    }
+    /// Builds a [`BondingObject`] from this [`MultiStage`] circuit.
+    ///
+    /// The witness must use only linear constraints: [`Driver::alloc`],
+    /// [`Driver::add`], and [`Driver::enforce_zero`] are permitted (without
+    /// referencing the [`Driver::ONE`] wire), but [`Driver::mul`] and
+    /// [`Driver::constant`] are rejected.
+    ///
+    /// The `ONE`-wire contribution is stripped so that the constant term in $Y$
+    /// is zero, as required of a bonding polynomial.
+    ///
+    /// [`Driver::mul`]: ragu_core::drivers::Driver::mul
+    /// [`Driver::add`]: ragu_core::drivers::Driver::add
+    /// [`Driver::alloc`]: ragu_core::drivers::Driver::alloc
+    /// [`Driver::constant`]: ragu_core::drivers::Driver::constant
+    /// [`Driver::enforce_zero`]: ragu_core::drivers::Driver::enforce_zero
+    /// [`Driver::ONE`]: ragu_core::drivers::Driver::ONE
+    pub fn into_bonding_object<'a>(self) -> Result<BondingObject<'a, F, R>>
+    where
+        Self: 'a,
+    {
+        // Validate: run synthesis with a driver that rejects mul and ONE usage.
+        let mut validator = BondingValidator::<F>::new();
+        self.witness(&mut validator, Empty)?;
+        if let Some(msg) = validator.error {
+            return Err(ragu_core::Error::InvalidWitness(msg.into()));
+        }
 
-    let adapter = Adapter::<S, F, R>(core::marker::PhantomData);
-    let metrics = metrics::eval(&adapter)?;
+        // Build the CircuitObject via the standard pipeline.
+        let inner = into_circuit_object::<_, _, R>(self)?;
 
-    if metrics.num_linear_constraints > R::num_coeffs() {
-        return Err(ragu_core::Error::LinearBoundExceeded {
-            limit: R::num_coeffs(),
-        });
+        Ok(BondingObject::new(Box::new(Stripped::<F, R>(inner))))
     }
-    if metrics.num_multiplication_constraints > R::n() {
-        return Err(ragu_core::Error::MultiplicationBoundExceeded { limit: R::n() });
-    }
-
-    Ok(Some(BondingObject::new(Box::new(Processed {
-        adapter,
-        metrics,
-    }))))
 }
 
-/// Bridges [`MultiStageCircuit::routing`](super::MultiStageCircuit::routing)
-/// to [`Circuit`] so we can reuse the standard synthesis drivers.
-/// Pre-allocates gate wire handles with the real driver, then hands a
-/// [`RoutingDriver`] decorator to the routing method.
-struct Adapter<S, F, R>(core::marker::PhantomData<(S, F, R)>);
+/// Wire type for [`BondingValidator`] that distinguishes the ONE wire from
+/// normal allocated wires.
+#[derive(Clone, PartialEq)]
+enum BondingWire {
+    One,
+    Normal,
+}
 
-impl<F: Field, R: Rank, S: super::MultiStageCircuit<F, R>> Circuit<F> for Adapter<S, F, R> {
-    type Instance<'source> = ();
-    type Witness<'source> = ();
-    type Output = ();
-    type Aux<'source> = ();
+/// A [`LinearExpression`] that detects references to [`BondingWire::One`].
+struct RejectOne(bool);
 
-    fn instance<'dr, 'source: 'dr, D: Driver<'dr, F = F>>(
-        &self,
-        _: &mut D,
-        _: DriverValue<D, ()>,
-    ) -> Result<Bound<'dr, D, ()>> {
+impl<F: Field> LinearExpression<BondingWire, F> for RejectOne {
+    fn add_term(mut self, wire: &BondingWire, _coeff: Coeff<F>) -> Self {
+        if *wire == BondingWire::One {
+            self.0 = true;
+        }
+        self
+    }
+
+    fn gain(self, _: Coeff<F>) -> Self {
+        self
+    }
+}
+
+/// A [`Driver`] that validates bonding-circuit constraints.
+///
+/// Bonding circuits may only use [`alloc`](Driver::alloc),
+/// [`add`](Driver::add), and [`enforce_zero`](Driver::enforce_zero) with
+/// normal wires. Calling [`mul`](Driver::mul),
+/// [`constant`](Driver::constant), or referencing the [`ONE`](Driver::ONE)
+/// wire in any linear constraint records a violation.
+///
+/// All methods succeed; violations are accumulated in the `error` field and
+/// checked by the caller after the witness completes.
+struct BondingValidator<F> {
+    error: Option<&'static str>,
+    _marker: core::marker::PhantomData<F>,
+}
+
+impl<F> BondingValidator<F> {
+    fn new() -> Self {
+        BondingValidator {
+            error: None,
+            _marker: core::marker::PhantomData,
+        }
+    }
+
+    fn record(&mut self, msg: &'static str) {
+        self.error.get_or_insert(msg);
+    }
+}
+
+impl<F: Field> DriverTypes for BondingValidator<F> {
+    type ImplField = F;
+    type ImplWire = BondingWire;
+    type MaybeKind = Empty;
+    type LCadd = RejectOne;
+    type LCenforce = RejectOne;
+}
+
+impl<'dr, F: Field> Driver<'dr> for BondingValidator<F> {
+    type F = F;
+    type Wire = BondingWire;
+    const ONE: Self::Wire = BondingWire::One;
+
+    fn alloc(&mut self, _: impl Fn() -> Result<Coeff<F>>) -> Result<BondingWire> {
+        Ok(BondingWire::Normal)
+    }
+
+    fn mul(
+        &mut self,
+        _: impl Fn() -> Result<(Coeff<F>, Coeff<F>, Coeff<F>)>,
+    ) -> Result<(BondingWire, BondingWire, BondingWire)> {
+        self.record("bonding circuits must not call mul");
+        Ok((
+            BondingWire::Normal,
+            BondingWire::Normal,
+            BondingWire::Normal,
+        ))
+    }
+
+    fn constant(&mut self, _: Coeff<F>) -> BondingWire {
+        self.record("bonding circuits must not create constants");
+        BondingWire::Normal
+    }
+
+    fn add(&mut self, lc: impl Fn(RejectOne) -> RejectOne) -> BondingWire {
+        if lc(RejectOne(false)).0 {
+            self.record("bonding circuits must not reference the ONE wire");
+        }
+        BondingWire::Normal
+    }
+
+    fn enforce_zero(&mut self, lc: impl Fn(RejectOne) -> RejectOne) -> Result<()> {
+        if lc(RejectOne(false)).0 {
+            self.record("bonding circuits must not reference the ONE wire");
+        }
         Ok(())
     }
-
-    fn witness<'dr, 'source: 'dr, D: Driver<'dr, F = F>>(
-        &self,
-        dr: &mut D,
-        _: DriverValue<D, ()>,
-    ) -> Result<(Bound<'dr, D, ()>, DriverValue<D, ()>)> {
-        let num_gates = S::num_routing_gates();
-        let mut gates = Vec::with_capacity(num_gates);
-        for _ in 0..num_gates {
-            gates.push(dr.mul(|| Ok((Coeff::Zero, Coeff::Zero, Coeff::Zero)))?);
-        }
-
-        S::routing(dr, &gates)?;
-
-        Ok(((), D::unit()))
-    }
 }
 
-/// The produced [`CircuitObject`].
-///
-/// The standard synthesis includes an `enforce_one` constraint that anchors
-/// the ONE wire. Bonding polynomials must not have this (zero constant term),
-/// so each evaluation method runs the full synthesis then strips it out.
-struct Processed<S, F, R> {
-    adapter: Adapter<S, F, R>,
-    metrics: metrics::CircuitMetrics,
-}
+/// Wraps a [`CircuitObject`] and strips the `enforce_one` contribution,
+/// giving a zero constant term in $Y$.
+struct Stripped<'a, F: Field, R: Rank>(Box<dyn CircuitObject<F, R> + 'a>);
 
-impl<F: Field + FromUniformBytes<64>, R: Rank, S: super::MultiStageCircuit<F, R>>
-    CircuitObject<F, R> for Processed<S, F, R>
-{
+impl<F: Field, R: Rank> CircuitObject<F, R> for Stripped<'_, F, R> {
     fn sxy(&self, x: F, y: F, key: &registry::Key<F>, floor_plan: &[ConstraintSegment]) -> F {
-        if x == F::ZERO || y == F::ZERO {
-            return F::ZERO;
-        }
-
         // Remove the ONE wire contribution: x^(4n-1) at y^0.
-        s::sxy::eval::<_, _, R>(&self.adapter, x, y, key, floor_plan)
-            .expect("should succeed if metrics succeeded")
-            - x.pow_vartime([(4 * R::n() - 1) as u64])
+        self.0.sxy(x, y, key, floor_plan) - x.pow_vartime([(4 * R::n() - 1) as u64])
     }
 
     fn sx(
@@ -131,15 +194,14 @@ impl<F: Field + FromUniformBytes<64>, R: Rank, S: super::MultiStageCircuit<F, R>
         x: F,
         key: &registry::Key<F>,
         floor_plan: &[ConstraintSegment],
-    ) -> unstructured::Polynomial<F, R> {
-        if x == F::ZERO {
-            return unstructured::Polynomial::new();
-        }
-        let mut poly = s::sx::eval(&self.adapter, x, key, floor_plan)
-            .expect("should succeed if metrics succeeded");
-
+    ) -> sparse::Polynomial<F, R> {
+        let mut poly = self.0.sx(x, key, floor_plan);
         // Horner places the last constraint (enforce_one) at y^0 = coeffs[0].
-        poly.as_mut()[0] = F::ZERO;
+        // TODO: sparse::Polynomial should support subtracting a field element
+        // from the constant term directly.
+        let coeff_0 = poly.iter_coeffs().next().unwrap();
+        let correction = sparse::Polynomial::from_coeffs(alloc::vec![coeff_0]);
+        poly.sub_assign(&correction);
         poly
     }
 
@@ -148,33 +210,22 @@ impl<F: Field + FromUniformBytes<64>, R: Rank, S: super::MultiStageCircuit<F, R>
         y: F,
         key: &registry::Key<F>,
         floor_plan: &[ConstraintSegment],
-    ) -> structured::Polynomial<F, R> {
-        if y == F::ZERO {
-            return structured::Polynomial::new();
-        }
-        let mut poly = s::sy::eval(&self.adapter, y, key, floor_plan)
-            .expect("should succeed if metrics succeeded");
-
+    ) -> sparse::Polynomial<F, R> {
+        let mut poly = self.0.sy(y, key, floor_plan);
         // Gate 0's c-wire holds the ONE wire; remove its y^0 contribution.
-        poly.backward().c[0] -= F::ONE;
+        // In the backward perspective, c[0] maps to degree 4n - 1.
+        let mut correction = sparse::View::<_, R, _>::backward();
+        correction.c.push(F::ONE);
+        poly.sub_assign(&correction.build());
         poly
     }
 
-    /// Returns constraint counts matching the synthesis shape.
-    ///
-    /// These counts include the `enforce_one` constraint that the synthesis
-    /// drivers emit, even though the polynomial has that contribution stripped.
-    /// This is correct: the counts describe the synthesis structure that the
-    /// floor plan and eval functions expect, not the final polynomial.
     fn constraint_counts(&self) -> (usize, usize) {
-        (
-            self.metrics.num_multiplication_constraints,
-            self.metrics.num_linear_constraints,
-        )
+        self.0.constraint_counts()
     }
 
     fn segment_records(&self) -> &[SegmentRecord] {
-        &self.metrics.segments
+        self.0.segment_records()
     }
 }
 
@@ -182,21 +233,21 @@ impl<F: Field + FromUniformBytes<64>, R: Rank, S: super::MultiStageCircuit<F, R>
 mod tests {
     use super::*;
     use crate::{
-        floor_planner,
+        WithAux, floor_planner,
         polynomials::TestRank,
         staging::{MultiStageCircuit, StageBuilder},
     };
     use ff::Field;
-    use ragu_core::drivers::LinearExpression;
+    use ragu_core::drivers::DriverValue;
+    use ragu_core::gadgets::Bound;
     use ragu_pasta::Fp;
 
     type R = TestRank;
 
-    /// Minimal [`MultiStageCircuit`] with routing that enforces gate 0's
-    /// a-wire equals gate 1's a-wire.
-    struct RouteEqual;
+    /// Minimal bonding circuit: allocates two wires and enforces equality.
+    struct EqualWires;
 
-    impl MultiStageCircuit<Fp, R> for RouteEqual {
+    impl MultiStageCircuit<Fp, R> for EqualWires {
         type Last = ();
         type Instance<'source> = ();
         type Witness<'source> = ();
@@ -213,50 +264,196 @@ mod tests {
 
         fn witness<'a, 'dr, 'source: 'dr, D: Driver<'dr, F = Fp>>(
             &self,
-            _: StageBuilder<'a, 'dr, D, R, (), ()>,
+            builder: StageBuilder<'a, 'dr, D, R, (), ()>,
             _: DriverValue<D, ()>,
-        ) -> Result<(Bound<'dr, D, ()>, DriverValue<D, ()>)> {
-            Ok(((), D::unit()))
-        }
-
-        fn num_routing_gates() -> usize {
-            2
-        }
-
-        fn routing<'dr, D: Driver<'dr, F = Fp>>(
-            dr: &mut D,
-            gates: &[(D::Wire, D::Wire, D::Wire)],
-        ) -> Result<()> {
-            let (a0, _, _) = &gates[0];
-            let (a1, _, _) = &gates[1];
-            dr.enforce_zero(|lc| lc.add(a0).sub(a1))
+        ) -> Result<WithAux<Bound<'dr, D, ()>, DriverValue<D, ()>>> {
+            let dr = builder.finish();
+            let w0 = dr.alloc(|| Ok(Coeff::Zero))?;
+            let w1 = dr.alloc(|| Ok(Coeff::Zero))?;
+            dr.enforce_zero(|lc| lc.add(&w0).sub(&w1))?;
+            Ok(WithAux::new((), D::unit()))
         }
     }
 
-    fn routing_obj() -> Box<dyn CircuitObject<Fp, R>> {
-        routing_object::<Fp, R, RouteEqual>()
-            .unwrap()
+    /// Circuit that calls `mul` — should be rejected.
+    struct UsesMul;
+
+    impl MultiStageCircuit<Fp, R> for UsesMul {
+        type Last = ();
+        type Instance<'source> = ();
+        type Witness<'source> = ();
+        type Output = ();
+        type Aux<'source> = ();
+
+        fn instance<'dr, 'source: 'dr, D: Driver<'dr, F = Fp>>(
+            &self,
+            _: &mut D,
+            _: DriverValue<D, ()>,
+        ) -> Result<Bound<'dr, D, ()>> {
+            Ok(())
+        }
+
+        fn witness<'a, 'dr, 'source: 'dr, D: Driver<'dr, F = Fp>>(
+            &self,
+            builder: StageBuilder<'a, 'dr, D, R, (), ()>,
+            _: DriverValue<D, ()>,
+        ) -> Result<WithAux<Bound<'dr, D, ()>, DriverValue<D, ()>>> {
+            let dr = builder.finish();
+            dr.mul(|| Ok((Coeff::Zero, Coeff::Zero, Coeff::Zero)))?;
+            Ok(WithAux::new((), D::unit()))
+        }
+    }
+
+    /// Circuit that calls `constant` — should be rejected.
+    struct UsesConstant;
+
+    impl MultiStageCircuit<Fp, R> for UsesConstant {
+        type Last = ();
+        type Instance<'source> = ();
+        type Witness<'source> = ();
+        type Output = ();
+        type Aux<'source> = ();
+
+        fn instance<'dr, 'source: 'dr, D: Driver<'dr, F = Fp>>(
+            &self,
+            _: &mut D,
+            _: DriverValue<D, ()>,
+        ) -> Result<Bound<'dr, D, ()>> {
+            Ok(())
+        }
+
+        fn witness<'a, 'dr, 'source: 'dr, D: Driver<'dr, F = Fp>>(
+            &self,
+            builder: StageBuilder<'a, 'dr, D, R, (), ()>,
+            _: DriverValue<D, ()>,
+        ) -> Result<WithAux<Bound<'dr, D, ()>, DriverValue<D, ()>>> {
+            let dr = builder.finish();
+            let _ = dr.constant(Coeff::One);
+            Ok(WithAux::new((), D::unit()))
+        }
+    }
+
+    /// Circuit that uses `D::ONE` in `enforce_zero` — should be rejected.
+    struct UsesOneInEnforceZero;
+
+    impl MultiStageCircuit<Fp, R> for UsesOneInEnforceZero {
+        type Last = ();
+        type Instance<'source> = ();
+        type Witness<'source> = ();
+        type Output = ();
+        type Aux<'source> = ();
+
+        fn instance<'dr, 'source: 'dr, D: Driver<'dr, F = Fp>>(
+            &self,
+            _: &mut D,
+            _: DriverValue<D, ()>,
+        ) -> Result<Bound<'dr, D, ()>> {
+            Ok(())
+        }
+
+        fn witness<'a, 'dr, 'source: 'dr, D: Driver<'dr, F = Fp>>(
+            &self,
+            builder: StageBuilder<'a, 'dr, D, R, (), ()>,
+            _: DriverValue<D, ()>,
+        ) -> Result<WithAux<Bound<'dr, D, ()>, DriverValue<D, ()>>> {
+            let dr = builder.finish();
+            let w = dr.alloc(|| Ok(Coeff::Zero))?;
+            dr.enforce_zero(|lc| lc.add(&D::ONE).sub(&w))?;
+            Ok(WithAux::new((), D::unit()))
+        }
+    }
+
+    /// Circuit that uses `D::ONE` in `add` — should be rejected.
+    struct UsesOneInAdd;
+
+    impl MultiStageCircuit<Fp, R> for UsesOneInAdd {
+        type Last = ();
+        type Instance<'source> = ();
+        type Witness<'source> = ();
+        type Output = ();
+        type Aux<'source> = ();
+
+        fn instance<'dr, 'source: 'dr, D: Driver<'dr, F = Fp>>(
+            &self,
+            _: &mut D,
+            _: DriverValue<D, ()>,
+        ) -> Result<Bound<'dr, D, ()>> {
+            Ok(())
+        }
+
+        fn witness<'a, 'dr, 'source: 'dr, D: Driver<'dr, F = Fp>>(
+            &self,
+            builder: StageBuilder<'a, 'dr, D, R, (), ()>,
+            _: DriverValue<D, ()>,
+        ) -> Result<WithAux<Bound<'dr, D, ()>, DriverValue<D, ()>>> {
+            let dr = builder.finish();
+            let _ = dr.add(|lc| lc.add(&D::ONE));
+            Ok(WithAux::new((), D::unit()))
+        }
+    }
+
+    fn bonding_obj() -> Box<dyn CircuitObject<Fp, R>> {
+        MultiStage::<Fp, R, _>::new(EqualWires)
+            .into_bonding_object()
             .unwrap()
             .into_inner()
     }
 
-    /// Bonding polynomials must have zero constant term (no ONE wire).
+    #[test]
+    fn rejects_mul() {
+        assert!(
+            MultiStage::<Fp, R, _>::new(UsesMul)
+                .into_bonding_object()
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn rejects_constant() {
+        assert!(
+            MultiStage::<Fp, R, _>::new(UsesConstant)
+                .into_bonding_object()
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn rejects_one_in_enforce_zero() {
+        assert!(
+            MultiStage::<Fp, R, _>::new(UsesOneInEnforceZero)
+                .into_bonding_object()
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn rejects_one_in_add() {
+        assert!(
+            MultiStage::<Fp, R, _>::new(UsesOneInAdd)
+                .into_bonding_object()
+                .is_err()
+        );
+    }
+
+    /// Bonding polynomials must have zero constant term in $Y$.
     #[test]
     fn zero_constant_term() {
-        let obj = routing_obj();
+        let obj = bonding_obj();
         let floor_plan = floor_planner::floor_plan(obj.segment_records());
         let key = registry::Key::new(Fp::random(&mut rand::rng()));
         let x = Fp::random(&mut rand::rng());
         let y = Fp::random(&mut rand::rng());
 
+        // s(0, y) = 0: no constraint on d_0 wires.
         assert_eq!(obj.sxy(Fp::ZERO, y, &key, &floor_plan), Fp::ZERO);
+        // s(x, 0) = 0: forces k(Y) = 0.
         assert_eq!(obj.sxy(x, Fp::ZERO, &key, &floor_plan), Fp::ZERO);
     }
 
     /// sxy(x,y) = sx(x).eval(y) = sy(y).eval(x).
     #[test]
     fn evaluation_consistency() {
-        let obj = routing_obj();
+        let obj = bonding_obj();
         let floor_plan = floor_planner::floor_plan(obj.segment_records());
         let key = registry::Key::new(Fp::random(&mut rand::rng()));
         let x = Fp::random(&mut rand::rng());
@@ -267,28 +464,25 @@ mod tests {
         assert_eq!(sxy, obj.sy(y, &key, &floor_plan).eval(x));
     }
 
-    /// Build a trace with gate 0 as ONE (zeros) and gates 1..n from (a, b) pairs.
-    fn build_trace(gate_values: &[(Fp, Fp)]) -> structured::Polynomial<Fp, R> {
-        let mut rx = structured::Polynomial::new();
-        {
-            let rx = rx.forward();
-            // Gate 0: ONE (all zeros in stage polynomials)
-            rx.a.push(Fp::ZERO);
-            rx.b.push(Fp::ZERO);
-            rx.c.push(Fp::ZERO);
-            for &(a, b) in gate_values {
-                rx.a.push(a);
-                rx.b.push(b);
-                rx.c.push(a * b);
-            }
+    /// Build a trace with gate 0 as ONE (zeros) and gates 1..n from (a, b)
+    /// pairs.
+    fn build_trace(gate_values: &[(Fp, Fp)]) -> sparse::Polynomial<Fp, R> {
+        let mut view = sparse::View::<_, R, _>::forward();
+        view.a.push(Fp::ZERO);
+        view.b.push(Fp::ZERO);
+        view.c.push(Fp::ZERO);
+        for &(a, b) in gate_values {
+            view.a.push(a);
+            view.b.push(b);
+            view.c.push(a * b);
         }
-        rx
+        view.build()
     }
 
-    /// Revdot is zero when routed wires are equal, nonzero otherwise.
+    /// Revdot is zero when bonding constraint is satisfied, nonzero otherwise.
     #[test]
-    fn revdot_routing_constraint() {
-        let obj = routing_obj();
+    fn revdot_bonding_constraint() {
+        let obj = bonding_obj();
         let floor_plan = floor_planner::floor_plan(obj.segment_records());
         let key = registry::Key::new(Fp::random(&mut rand::rng()));
         let y = Fp::random(&mut rand::rng());
@@ -297,11 +491,10 @@ mod tests {
         let v = Fp::random(&mut rand::rng());
         let w = Fp::random(&mut rand::rng());
 
-        let rx_equal = build_trace(&[(v, Fp::ONE), (v, Fp::ONE)]);
+        let rx_equal = build_trace(&[(v, v)]);
         assert_eq!(rx_equal.revdot(&sy), Fp::ZERO);
 
-        let rx_unequal = build_trace(&[(v, Fp::ONE), (w, Fp::ONE)]);
+        let rx_unequal = build_trace(&[(v, w)]);
         assert_ne!(rx_unequal.revdot(&sy), Fp::ZERO);
     }
-
 }
