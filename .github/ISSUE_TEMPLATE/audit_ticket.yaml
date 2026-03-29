@@ -39,7 +39,8 @@ body:
       label: Repo commit
       description: Select the relevant Ragu commit.
       options:
-        - c9649de
+        - c9649de (1st audit leg)
+        - 4a40b3e (2nd audit leg)
       default: 0
     validations:
       required: false
